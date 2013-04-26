@@ -51,8 +51,8 @@ function(
 
 		/* Use orbitcam */
 		scriptComponent.scripts.push(new OrbitCamControlScript({
-			spherical: new Vector3(40, 90*MathUtils.DEG_TO_RAD, 20*MathUtils.DEG_TO_RAD),
-			baseDistance: 40 / 4,
+			spherical: new Vector3(5, 90*MathUtils.DEG_TO_RAD, 20*MathUtils.DEG_TO_RAD),
+			baseDistance: 5 / 4,
 			domElement: goo.renderer.domElement
 		}));
 		cameraEntity.setComponent(scriptComponent);

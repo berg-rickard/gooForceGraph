@@ -32,44 +32,39 @@ define(
 	ForceTreeSystem.prototype.deleted = function(entity) {}
 	*/
 	
-	ForceTreeSystem.prototype.process = function(entities, tpf) {
+	ForceTreeSystem.prototype.process = function (entities, tpf) {
+		this._updateAcceleration(entities);
 		for (var i = entities.length - 1; i >= 0; i--) {
-			this._updateAcceleration(entities[i]);
 			this._updateVelocity(entities[i], tpf);
 			this._updatePosition(entities[i], tpf);
 		}
-	}
+	};
 	
-	ForceTreeSystem.prototype._updateAcceleration = function(entity, entities) {
-		var mid = this._updateGravity(entity);
-		var acc = entity.forceNodeComponent._acceleration;
-		acc.setv(mid);
-		
-		
-	}
+	ForceTreeSystem.prototype._updateAcceleration = function (entities) {
+		for (var i = entities.length -1; i >= 0; i--) {
+			entities[i].forceNodeComponent._acceleration.setd(0,0,0);
+		}
+		this._updateGravity(entities);
+		this._updateRepulsion(entities);
+		//this._updateAttraction(entities);
+	};
 	
-	ForceTreeSystem.prototype._updateVelocity = function(entity, tpf) {
+	ForceTreeSystem.prototype._updateVelocity = function (entity, tpf) {
 		var mid = this._middleStorage;
 		var acc = entity.forceNodeComponent._acceleration;
 		
 		var vel = entity.forceNodeComponent._velocity;
 		var fric = (1-entity.forceNodeComponent.friction);
-		/* Performance test *
-		vel.data[0] += acc.data[0]*this.gravity;
-		vel.data[1] += acc.data[1]*this.gravity;
-		vel.data[2] += acc.data[2]*this.gravity;
-		/**/
 
-		mid.setv(acc);
-		mid.muld(tpf, tpf, tpf);
+		mid.setv(acc).muld(tpf, tpf, tpf);
 		vel.addv(mid)
-		vel.muld(fric, fric, fric)
-	}
+		vel.muld(fric, fric, fric);
+	};
 	
-	ForceTreeSystem.prototype._updatePosition = function(entity, tpf) {
+	ForceTreeSystem.prototype._updatePosition = function (entity, tpf) {
 		var mid = this._middleStorage;
 		var vel = entity.forceNodeComponent._velocity;
-		if(mid.length() > 1e-4) {
+		if (mid.length() > 1e-4) {
 			var pos = entity.transformComponent.transform.translation;
 			
 			mid.setv(vel);
@@ -78,26 +73,52 @@ define(
 			pos.addv(mid);
 			entity.transformComponent.setUpdated();
 		}
-	}
+	};
 	
-	ForceTreeSystem.prototype._updateGravity = function(entity) {
-		var pos = entity.transformComponent.worldTransform.translation;
-		var mid = this._middleStorage;
-		
-		// Gravity
-		mid.setd(0,0,0)
-		mid.subv(pos);
-		if(mid.length() > 0.4) {
-			mid.normalize();
+	
+	ForceTreeSystem.prototype._updateGravity = function (entities) {
+		var acc, pos, entity, mid = this._middleStorage;
+		for (var i = entities.length - 1; i >= 0; i--) {
+			entity = entities[i];
+			acc = entity.forceNodeComponent._acceleration;
+			pos = entity.transformComponent.worldTransform.translation;
+			
+			mid.setv(pos).invert();
+			if (mid.length() > 0.4) {
+				mid.normalize();
+			}
+			mid.muld(this.gravity, this.gravity, this.gravity);
+			
+			acc.addv(mid);
 		}
-		mid.muld(this.gravity, this.gravity, this.gravity);
-		
-		return mid;
-	}
+	};
 	
-	ForceTreeSystem.prototype._updateRepulsion = function(entity, entities) {
-		
-	}
+	ForceTreeSystem.prototype._updateRepulsion = function (entities) {
+		var acc1, acc2, pos1, pos2, q1, q2, m1, m2, scale, mid = this._middleStorage;
+		for (var i = entities.length - 1; i >= 0; i--) {
+			for (var j = i - 1; j >= 0; j--) {
+				acc1 = entities[i].forceNodeComponent._acceleration;
+				acc2 = entities[j].forceNodeComponent._acceleration;
+				q1 = entities[i].forceNodeComponent.charge;
+				q2 = entities[j].forceNodeComponent.charge;
+				m1 = entities[i].forceNodeComponent.mass;
+				m2 = entities[j].forceNodeComponent.mass;
+				pos1 = entities[i].transformComponent.worldTransform.translation;
+				pos2 = entities[j].transformComponent.worldTransform.translation;
+				
+				mid.setv(pos2).subv(pos1);
+				scale = q2*q1 / (m2 * mid.lengthSquared());
+				scale *= 1e6 // Apparently a nice stable number
+				mid.normalize();
+				mid.muld(scale, scale, scale);
+				acc2.addv(mid);
+				mid.invert().muld(m2/m1, m2/m1, m2/m1);
+				acc1.addv(mid);
+			}
+		}
+	};
+	
+	ForceTreeSystem.prototype._updateAttraction = function (entities) {};
 	
 	return ForceTreeSystem;
 });

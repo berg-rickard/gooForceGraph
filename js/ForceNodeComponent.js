@@ -9,9 +9,9 @@ define(
 	"use strict";
 	
 	var _defaults = {
-		friction: 0.01,
-		charge: 1,
-		mass: 1
+		friction: 0.05,
+		charge: 0.0001,
+		mass: 0.1
 	};
 	
 	function ForceNodeComponent(properties) {
