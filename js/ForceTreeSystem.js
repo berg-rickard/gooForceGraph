@@ -9,7 +9,7 @@ define(
 	"use strict";
 	
 	var _defaults = {
-		gravity: 1,
+		gravity: 10,
 	}
 	
 	function ForceTreeSystem(properties) {
@@ -95,7 +95,7 @@ define(
 		var cb = entity.forceTreeComponent._callbacks;
 		if (cb && cb.length) {
 			for (var i = cb.length - 1; i >= 0; i--) {
-				cb[i](entity.forceTreeComponent);
+				cb[i]();
 			}
 		}
 	};

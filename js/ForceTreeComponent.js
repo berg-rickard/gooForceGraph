@@ -15,8 +15,8 @@ define(
 	};
 	
 	var _edgeDefaults = {
-		strength: 10,
-		length: 1,
+		strength: 50,
+		length: 10,
 	};
 	
 	function ForceTreeComponent(properties) {
