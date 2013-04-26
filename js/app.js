@@ -14,7 +14,7 @@ require(
 	'goo/renderer/shaders/ShaderLib',
 	'goo/renderer/Material',
 	'goo/math/MathUtils',
-	'ForceNodeComponent',
+	'ForceTreeComponent',
 	'ForceTreeSystem',
 	'goo/entities/components/MeshRendererComponent',
 	'goo/entities/components/MeshDataComponent'
@@ -27,7 +27,7 @@ require(
 	ShaderLib,
 	Material,
 	MathUtils,
-	ForceNodeComponent,
+	ForceTreeComponent,
 	ForceTreeSystem,
 	MeshRendererComponent,
 	MeshDataComponent
@@ -39,48 +39,98 @@ require(
 
 
 	// A plane
-	var plane = ShapeCreator.createQuad(500, 500, 1, 1);
-	var planeEntity = EntityUtils.createTypicalEntity(goo.world, plane);
+	var box = ShapeCreator.createBox(0.1, 0.1, 0.1, 1, 1);
+	var boxEntity = EntityUtils.createTypicalEntity(goo.world, box);
 	
-	var planeMat = Material.createMaterial(ShaderLib.simpleColored);
-	planeMat.uniforms.color = [0, 0.3, 0.3];
-	planeEntity.meshRendererComponent.materials.push(planeMat);
-	planeEntity.transformComponent.transform.translation.y = -5;
-	planeEntity.transformComponent.transform.rotation.rotateX(-90*MathUtils.DEG_TO_RAD);
+	var boxMat = Material.createMaterial(ShaderLib.simpleLit);
+	boxMat.uniforms.materialAmbient = [0.2, 0.2, 0.2, 1];
+	boxMat.uniforms.materialDiffuse = [0.6, 0.6, 0.6, 1];
+	boxEntity.meshRendererComponent.materials.push(boxMat);
 	
-	//planeEntity.addToWorld();
+	boxEntity.addToWorld();
 	
 	// Force directed tree system
 	var fts = new ForceTreeSystem({
-		gravity: 10
+		gravity: 100
 	});
 	goo.world.setSystem(fts);
 	
 	
 	// Sphere setup
-	var sphere = ShapeCreator.createSphere(12, 12, 0.04);
+	var sphere = ShapeCreator.createSphere(12, 12, 1e-1);
 	var mdc = new MeshDataComponent(sphere);
 	
+	var sphereShader = Material.createShader(ShaderLib.simpleLit, 'simplelit');
 	var sphereMat = Material.createMaterial(ShaderLib.simpleLit)
 	sphereMat.uniforms.materialAmbient = [0.2,0.2,0.2,1];
 	sphereMat.uniforms.materialDiffuse = [1.0,0.2,1.0,1];
-	var mrc = new MeshRendererComponent();
-	mrc.materials.push(sphereMat);
 	
 	function rnd() {
-		return (Math.random() - .5)*3
+		return (Math.random() - .5);
 	}
 	// Bunch of spheres
-	for (var i = 0; i < 200; i++) {
+	var count = 100;
+	
+	var ftcs = [];
+	for (var i = 0; i < count; i++) {
 		var entity = goo.world.createEntity();
+		var mrc = new MeshRendererComponent();
+		var material = Material.createMaterial(ShaderLib.simpleLit);
+		if(i < 2) {
+			material.uniforms.materialAmbient = [0,1,0,1];		
+		} else {
+			material.uniforms.materialAmbient = [.7*i/count, 0, .7*(1-i/count), 1];
+		}
+		material.uniforms.materialDiffuse = [ .1, .1, .1, 1];
+		mrc.materials.push(material);
 		entity.setComponent(mrc);
 		entity.setComponent(mdc);
-		entity.setComponent(new ForceNodeComponent({
-		}));
+		
+		var charge = (Math.random()+.5) * 1e-3;
+		var ftc = new ForceTreeComponent({
+			charge: charge
+		})
+		charge *= 1e3;
+		charge = (charge - 1)*5 + 1;
+		entity.setComponent(ftc);
+		ftcs.push(ftc);
 		entity.transformComponent.transform.translation.setd(rnd(), rnd(), rnd());
+		entity.transformComponent.transform.scale.setd(charge, charge, charge);
 		entity.addToWorld();
 	}
 	
+	ftcs[0].connect(ftcs[1], 0.3, 1);
 	
+	// Bunch of edges
+	/*var cylinder = ShapeCreator.createBox(1,0.1,0.1,1,1);
+	
+	var entity = goo.world.createEntity();
+	var mrc = new MeshRendererComponent();
+	var mdc2 = new MeshDataComponent(cylinder);
+	var material = Material.createMaterial(ShaderLib.simpleLit);
+	mrc.materials.push(material);
+	entity.setComponent(mrc);
+	entity.setComponent(mdc2);
+	entity.setComponent(new ForceTreeComponent({
+		type: 'edge'
+	}));
+	//entity.addToWorld();
+	*/
+	
+	document.body.addEventListener('click', function() {
+		var entity = goo.world.createEntity();
+		var mrc = new MeshRendererComponent();
+		var material = Material.createMaterial(ShaderLib.simpleLit);
+		material.uniforms.materialAmbient = [.7, .7, .7, 1];
+		material.uniforms.materialDiffuse = [ .1, .1, .1, 1];
+		mrc.materials.push(material);
+		entity.setComponent(mrc);
+		entity.setComponent(mdc);
+		entity.setComponent(new ForceTreeComponent({
+			nodes: [ftcs[0], ftcs[1]]
+		}));
+		entity.transformComponent.transform.translation.setd(8*rnd(), 8*rnd(), 8*rnd());
+		entity.addToWorld();
+	});
 });
 });

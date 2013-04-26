@@ -38,12 +38,12 @@ function(
 		// Light
 		var lightEntity = goo.world.createEntity('LightEntity');
 		lightEntity.setComponent(new LightComponent(new PointLight()));
-		lightEntity.transformComponent.transform.translation.setd(-1000,1000,1000);
+		lightEntity.transformComponent.transform.translation.setd(-100,200,400);
 		lightEntity.addToWorld();
 
 		// Camera
 		var cameraEntity = goo.world.createEntity("CameraEntity");
-		cameraEntity.setComponent(new CameraComponent(new Camera(45, 1, 1, 10000)));
+		cameraEntity.setComponent(new CameraComponent(new Camera(45, 1, 1e-4, 10000)));
 		cameraEntity.addToWorld();
 
 		// Camera control
@@ -51,7 +51,7 @@ function(
 
 		/* Use orbitcam */
 		scriptComponent.scripts.push(new OrbitCamControlScript({
-			spherical: new Vector3(5, 90*MathUtils.DEG_TO_RAD, 20*MathUtils.DEG_TO_RAD),
+			spherical: new Vector3(5, 70*MathUtils.DEG_TO_RAD, 20*MathUtils.DEG_TO_RAD),
 			baseDistance: 5 / 4,
 			domElement: goo.renderer.domElement
 		}));
