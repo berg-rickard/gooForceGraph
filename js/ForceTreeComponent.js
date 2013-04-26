@@ -8,15 +8,15 @@ define(
 ) {
 	"use strict";
 	
-	var _nodeDefaults = {
+	var _defaults = {
 		friction: 0.02,
-		charge: 1e-3,
-		mass: 0.1
+		charge: 1e-1,
+		mass: 1
 	};
 	
 	var _edgeDefaults = {
 		strength: 10,
-		length: 0.3,
+		length: 1,
 	};
 	
 	function ForceTreeComponent(properties) {
@@ -24,16 +24,6 @@ define(
 		this.type = 'ForceTreeComponent';
 
 		properties || (properties = {});
-		var _defaults;
-		if(properties.type == 'edge') {
-			this.isEdge = true;
-			this.nodes = properties.nodes;
-			
-			_defaults = _edgeDefaults;
-		} else {
-			this.isEdge = false;
-			_defaults = _nodeDefaults;
-		}
 		
 		for (var key in _defaults) {
 			this[key] = (properties[key] !== undefined) ? properties[key] : _defaults[key];
@@ -41,6 +31,11 @@ define(
 		
 		this._acceleration = new Vector3();
 		this._velocity = new Vector3();
+		this._callbacks = [];
+		this._connections = [];
+		if (properties.gravity) {
+			this.gravity = properties.gravity;
+		}
 	}
 	
 	ForceTreeComponent.prototype = Object.create(Component.prototype);
@@ -48,15 +43,29 @@ define(
 	
 	ForceTreeComponent.prototype.connect = function(ftc, length, strength) {
 		if(ftc === this) {
-			console.warn('You cant be your own sibling');
+			console.error('You cant be your own sibling');
 			return;
 		}
-		this.sibling = ftc;
-		ftc.sibling = this;
-		
-		this.edgeLength = ftc.edgeLength = length || _edgeDefaults.length;
-		this.edgeStrength = ftc.edgeStrength = strength || _edgeDefaults.strength;
+		for (var i = 0; i < this._connections.length; i++) {
+			if(this._connections[i].node === ftc) {
+				console.error('The connection already exists');
+				return;
+			}
+		}
+		this._connections.push({
+			length: length || _edgeDefaults.length,
+			strength: strength || _edgeDefaults.length,
+			node: ftc
+		});
+		ftc._connections.push({
+			length: length || _edgeDefaults.length,
+			strength: strength || _edgeDefaults.length,
+			node: this
+		});
 	};
+	ForceTreeComponent.prototype.addCallback = function(callback) {
+		this._callbacks.push(callback);
+	}
 	
 	
 	return ForceTreeComponent;

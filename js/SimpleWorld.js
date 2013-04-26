@@ -27,13 +27,14 @@ function(
 	SimpleWorld = {};
 	SimpleWorld.createTypicalRunner = function() {
 		var goo = new GooRunner({
-			showStats: true
+			showStats: true,
+			manuallyStartGameLoop: true
 		});
 
 		// DOM
 		goo.renderer.domElement.id = "goo";
 		document.body.appendChild(goo.renderer.domElement);
-		goo.renderer.setClearColor(0.1,0.1,0.1,1.0);
+		goo.renderer.setClearColor(0.0,0.0,0.0,1.0);
 
 		// Light
 		var lightEntity = goo.world.createEntity('LightEntity');
@@ -51,8 +52,8 @@ function(
 
 		/* Use orbitcam */
 		scriptComponent.scripts.push(new OrbitCamControlScript({
-			spherical: new Vector3(5, 70*MathUtils.DEG_TO_RAD, 20*MathUtils.DEG_TO_RAD),
-			baseDistance: 5 / 4,
+			spherical: new Vector3(150, 70*MathUtils.DEG_TO_RAD, 20*MathUtils.DEG_TO_RAD),
+			baseDistance: 150 / 4,
 			domElement: goo.renderer.domElement
 		}));
 		cameraEntity.setComponent(scriptComponent);

@@ -27,14 +27,24 @@ define(
 	ForceTreeSystem.prototype = Object.create(System.prototype);
 	ForceTreeSystem.prototype.constructor = ForceTreeSystem;
 	
+	
+	ForceTreeSystem.prototype.inserted = function(entity) {
+		if(!entity.forceTreeComponent._pos) {
+			entity.forceTreeComponent._pos = entity.transformComponent.transform.translation;
+			if(entity.forceTreeComponent.fixed) {
+				entity.transformComponent.transform.translation.setv(entity.forceTreeComponent.fixed);
+				entity.transformComponent.setUpdated();
+			}
+		}
+	}
 	/*
-	ForceTreeSystem.prototype.inserted = function(entity) {}
 	ForceTreeSystem.prototype.deleted = function(entity) {}
 	*/
 	
 	ForceTreeSystem.prototype.process = function (entities, tpf) {
-		tpf /= 5;
-		for (var j = 0; j < 5; j++) {
+		var iterations = 4;
+		tpf /= iterations;
+		for (var j = 0; j < iterations; j++) {
 			this._updateAcceleration(entities);
 			for (var i = entities.length - 1; i >= 0; i--) {
 				if(!entities[i].forceTreeComponent.isEdge) {
@@ -46,7 +56,7 @@ define(
 	};
 	
 	ForceTreeSystem.prototype._updateAcceleration = function (entities) {
-		for (var i = entities.length -1; i >= 0; i--) {
+		for (var i = entities.length - 1; i >= 0; i--) {
 			entities[i].forceTreeComponent._acceleration.setd(0,0,0);
 		}
 		this._updateGravity(entities);
@@ -66,18 +76,27 @@ define(
 		vel.muld(fric, fric, fric);
 	};
 	
-	ForceTreeSystem.prototype._updatePosition = function (entity, tpf) {
-		var mid = this._middleStorage;
-		var vel = entity.forceTreeComponent._velocity;
-		if (mid.length() > 1e-4) {
-			var pos = entity.transformComponent.transform.translation;
-			
-			mid.setv(vel);
-			mid.muld(tpf, tpf, tpf);
-			
-			pos.addv(mid);
-			entity.transformComponent.updateTransform();
-			entity.transformComponent.updateWorldTransform();
+	ForceTreeSystem.prototype._updatePosition = function (entity, tpf) {	
+	
+		if(!entity.forceTreeComponent.fixed) {
+			var mid = this._middleStorage;
+			var vel = entity.forceTreeComponent._velocity;
+			if (mid.length() > 1e-4) {
+				var pos = entity.transformComponent.transform.translation;
+				
+				mid.setv(vel);
+				mid.muld(tpf, tpf, tpf);
+				
+				pos.addv(mid);
+				entity.transformComponent.updateTransform();
+				entity.transformComponent.updateWorldTransform();
+			}
+		}
+		var cb = entity.forceTreeComponent._callbacks;
+		if (cb && cb.length) {
+			for (var i = cb.length - 1; i >= 0; i--) {
+				cb[i](entity.forceTreeComponent);
+			}
 		}
 	};
 	
@@ -92,10 +111,11 @@ define(
 			pos = entity.transformComponent.worldTransform.translation;
 			
 			mid.setv(pos).invert();
-			if (mid.length() > 0.4) {
+			if (mid.length() > 0.04) {
 				mid.normalize();
 			}
-			mid.muld(this.gravity, this.gravity, this.gravity);
+			var gravity = entity.forceTreeComponent.gravity || this.gravity;
+			mid.muld(gravity, gravity, gravity);
 			
 			acc.addv(mid);
 		}
@@ -131,25 +151,17 @@ define(
 	};
 	
 	ForceTreeSystem.prototype._updateAttraction = function (entities) {
-		var ftc;
-		for(var i = entities.length - 1; i >= 0; i--) {
-			ftc = entities[i].forceTreeComponent;
-			if(ftc && ftc.sibling) {
-				ftc.sibling.siblingPos = entities[i].transformComponent.transform.translation;
-			}
-		}
-	
 		var m1, m2, acc1, acc2, pos1, pos2, force, ftc, mid = this._middleStorage;
 		for (var i = entities.length - 1; i >= 0; i--) {
 			ftc = entities[i].forceTreeComponent;
-			if (ftc.sibling) {
+			for (var j = ftc._connections.length - 1; j >= 0; j--) {
 				m1 = entities[i].forceTreeComponent.mass;
 				acc1 = ftc._acceleration;
-				pos1 = entities[i].transformComponent.worldTransform.translation;
-				pos2 = ftc.siblingPos;
+				pos1 = ftc._pos;
+				pos2 = ftc._connections[j].node._pos;
 				
 				mid.setv(pos1).subv(pos2);
-				force = (ftc.edgeLength - mid.length()) * ftc.edgeStrength;
+				force = (ftc._connections[j].length - mid.length()) * ftc._connections[j].strength;
 				force /= m1;
 
 				mid.normalize().muld(force, force, force);
