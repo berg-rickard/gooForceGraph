@@ -9,7 +9,7 @@ define(
 	"use strict";
 	
 	var _defaults = {
-		gravity: 10,
+		gravity: 10
 	}
 	
 	function ForceTreeSystem(properties) {
@@ -42,7 +42,7 @@ define(
 	*/
 	
 	ForceTreeSystem.prototype.process = function (entities, tpf) {
-		var iterations = 4;
+		var iterations = Math.max(Math.floor(tpf / 0.03), 4);
 		tpf /= iterations;
 		for (var j = 0; j < iterations; j++) {
 			this._updateAcceleration(entities);

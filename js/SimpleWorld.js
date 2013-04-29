@@ -9,7 +9,8 @@ define([
 	'goo/loaders/Loader',
 	'goo/loaders/ScriptLoader',
 	'goo/entities/components/LightComponent',
-	'goo/renderer/light/PointLight'
+	'goo/renderer/light/PointLight',
+	'MyControlScript'
 ],
 function(
 	GooRunner,
@@ -22,7 +23,8 @@ function(
 	Loader,
 	ScriptLoader,
 	LightComponent,
-	PointLight
+	PointLight,
+	MyControlScript
 ) {
 	SimpleWorld = {};
 	SimpleWorld.createTypicalRunner = function() {
@@ -44,16 +46,16 @@ function(
 
 		// Camera
 		var cameraEntity = goo.world.createEntity("CameraEntity");
-		cameraEntity.setComponent(new CameraComponent(new Camera(45, 1, 1e-4, 10000)));
+		cameraEntity.setComponent(new CameraComponent(new Camera(45, 1, 1, 1000)));
 		cameraEntity.addToWorld();
 
 		// Camera control
 		var scriptComponent = new ScriptComponent();
 
 		/* Use orbitcam */
-		scriptComponent.scripts.push(new OrbitCamControlScript({
-			spherical: new Vector3(150, 70*MathUtils.DEG_TO_RAD, 20*MathUtils.DEG_TO_RAD),
-			baseDistance: 150 / 4,
+		scriptComponent.scripts.push(new MyControlScript({
+			spherical: new Vector3(250, 0,0),//70*MathUtils.DEG_TO_RAD, 20*MathUtils.DEG_TO_RAD),
+			baseDistance: 250 / 4,
 			domElement: goo.renderer.domElement
 		}));
 		cameraEntity.setComponent(scriptComponent);
