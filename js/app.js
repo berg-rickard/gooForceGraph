@@ -55,7 +55,7 @@ require(
 
 		
 		// Force directed tree system
-		var count = 100;
+		var count = 200;
 		for(var i = 0; i < count; i++) {
 			addSphere(Math.random(), count);
 		}
