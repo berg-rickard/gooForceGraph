@@ -9,7 +9,7 @@ define(
 	"use strict";
 	
 	var _defaults = {
-		friction: 0.02,
+		friction: 0.05,
 		charge: 1e-1,
 		mass: 1
 	};
