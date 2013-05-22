@@ -56,7 +56,7 @@ require(
 
 		
 		// Force directed tree system
-		var count = 200;
+		var count = 150;
 		for(var i = 0; i < count; i++) {
 			addSphere(Math.random(), count);
 		}
@@ -148,17 +148,17 @@ require(
 		}
 	
 		var binder = ShapeCreator.createBox(.3, .3, 1, 1, 1);
-		var binderMdc = new MeshDataComponent(binder);
 
 		var binderMaterial = Material.createMaterial(ShaderLib.simpleLit);
 		// REVIEW: .uniforms is missing here.
 		binderMaterial.materialAmbient = [.6, .6, .6];
 
-		var binderMrc = new MeshRendererComponent();
-		binderMrc.materials.push(binderMaterial);
-		binderMrc.cullMode = 'Never';
 	
 		function addConnection(ftc1, ftc2, length, strength) {
+			var binderMdc = new MeshDataComponent(binder);
+			var binderMrc = new MeshRendererComponent();
+			binderMrc.cullMode = 'Never';
+			binderMrc.materials.push(binderMaterial);
 			ftc1.connect(ftc2, length, strength);
 	
 			// Edge visualizers

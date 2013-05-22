@@ -91,8 +91,7 @@ define(
 				mid.muld(tpf, tpf, tpf);
 				
 				pos.addv(mid);
-				entity.transformComponent.updateTransform();
-				entity.transformComponent.updateWorldTransform();
+				entity.transformComponent.setUpdated();
 			}
 		}
 		var cb = entity.forceTreeComponent._callbacks;
