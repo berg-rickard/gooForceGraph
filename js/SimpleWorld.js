@@ -63,6 +63,7 @@ function(
 		return goo;
 	};
 
+	// REVIEW: Why not return the function or even goo directly ?
 	return SimpleWorld;
 
 });

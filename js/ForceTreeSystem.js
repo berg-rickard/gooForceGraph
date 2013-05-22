@@ -27,7 +27,7 @@ define(
 	ForceTreeSystem.prototype = Object.create(System.prototype);
 	ForceTreeSystem.prototype.constructor = ForceTreeSystem;
 	
-	
+	// REVIEW: add some jsDoc
 	ForceTreeSystem.prototype.inserted = function(entity) {
 		if(!entity.forceTreeComponent._pos) {
 			entity.forceTreeComponent._pos = entity.transformComponent.transform.translation;
@@ -55,6 +55,7 @@ define(
 		}
 	};
 	
+	// REVIEW: add some jsDoc
 	ForceTreeSystem.prototype._updateAcceleration = function (entities) {
 		for (var i = entities.length - 1; i >= 0; i--) {
 			entities[i].forceTreeComponent._acceleration.setd(0,0,0);
@@ -64,6 +65,7 @@ define(
 		this._updateAttraction(entities);
 	};
 	
+	// REVIEW: add some jsDoc
 	ForceTreeSystem.prototype._updateVelocity = function (entity, tpf) {
 		var mid = this._middleStorage;
 		var acc = entity.forceTreeComponent._acceleration;
@@ -76,6 +78,7 @@ define(
 		vel.muld(fric, fric, fric);
 	};
 	
+	// REVIEW: add some jsDoc
 	ForceTreeSystem.prototype._updatePosition = function (entity, tpf) {	
 	
 		if(!entity.forceTreeComponent.fixed) {
@@ -100,7 +103,7 @@ define(
 		}
 	};
 	
-	
+	// REVIEW: add some jsDoc	
 	ForceTreeSystem.prototype._updateGravity = function (entities) {
 		var acc, pos, entity, mid = this._middleStorage;
 		for (var i = entities.length - 1; i >= 0; i--) {
@@ -121,6 +124,7 @@ define(
 		}
 	};
 	
+	// REVIEW: add some jsDoc	
 	ForceTreeSystem.prototype._updateRepulsion = function (entities) {
 		var acc1, acc2, pos1, pos2, q1, q2, m1, m2, force, mid = this._middleStorage;
 		for (var i = entities.length - 1; i >= 0; i--) {
@@ -128,6 +132,7 @@ define(
 			for (var j = i - 1; j >= 0; j--) {
 				if (entities[j].forceTreeComponent.isEdge) continue;
 				
+				// REVIEW: maybe move some values depending on [i] to the outer loop
 				acc1 = entities[i].forceTreeComponent._acceleration;
 				acc2 = entities[j].forceTreeComponent._acceleration;
 				q1 = entities[i].forceTreeComponent.charge;
@@ -150,11 +155,14 @@ define(
 		}
 	};
 	
+	// REVIEW: add some jsDoc	
 	ForceTreeSystem.prototype._updateAttraction = function (entities) {
 		var m1, m2, acc1, acc2, pos1, pos2, force, ftc, mid = this._middleStorage;
 		for (var i = entities.length - 1; i >= 0; i--) {
 			ftc = entities[i].forceTreeComponent;
 			for (var j = ftc._connections.length - 1; j >= 0; j--) {
+			
+				// REVIEW: maybe move m1 to the outer loop
 				m1 = entities[i].forceTreeComponent.mass;
 				acc1 = ftc._acceleration;
 				pos1 = ftc._pos;

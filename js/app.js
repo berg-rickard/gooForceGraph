@@ -43,6 +43,7 @@ require(
 		addPicker(function(pickedList) {
 			for (var i = 0; i < pickedList.length; i++) {
 				if(pickedList[i].entity.forceTreeComponent) {
+					// REVIEW: accessing private member
 					goo.world.entityManager._entities[1].scriptComponent.scripts[0].goingToLookAt = pickedList[i].entity.transformComponent.transform.translation;
 					break;
 				}
@@ -63,21 +64,26 @@ require(
 	}
 	
 	var addSphere = (function() {
-		// Sphere setup
+		// shared, encapsulated sphere settings
 		var sphere = ShapeCreator.createSphere(12, 12, 1);
 		var mdc = new MeshDataComponent(sphere);
 		
 		var sphereShader = Material.createShader(ShaderLib.simpleLit, 'simplelit');
+		// REVIEW: sphereShader and sphereMat are never used
 		var sphereMat = Material.createMaterial(ShaderLib.simpleLit)
 		sphereMat.uniforms.materialAmbient = [0.3,0.3,0.3,1];
 		sphereMat.uniforms.materialDiffuse = [1.0,0.2,1.0,1];
 	
-		// Bunch of spheres
+		// generate random values between -20 and +20 to be used later as sphere positions.
 		function rnd() {
 			return (Math.random() - .5)*40;
 		}
 
+		// array of ForceTreeComponents to find suitable parent nodes to connect to.
 		var ftcs = [];
+		
+		/* @param val - a numeric value that will be used for the sphere size and charge.
+		*/
 		function addSphere(val, count) {
 			var scale = val*3 + .7;
 
@@ -113,6 +119,7 @@ require(
 
 				var length = 10
 				var strength = (ftcs.length > 5) ? 50 : 200;
+				// Math.pow( x:x<1, 1.5) results in values significantly lower than x
 				var parent = Math.floor(Math.pow(Math.random(),1.5)*ftcs.length);
 				addConnection(ftcs[parent], ftc, length, strength);
 			}
@@ -120,6 +127,7 @@ require(
 			ftcs.push(ftc);
 			entity.addToWorld();
 		}
+		// REVIEW: why not return an anonymous function
 		return addSphere;
 	}());
 	
@@ -128,6 +136,7 @@ require(
 		var mid = new Vector3();
 		function connectionCallback(ftc1, ftc2) {
 			if(ftc1 && ftc2) {
+				// REVIEW: accessing a private member
 				mid.setv(ftc1._pos).addv(ftc2._pos).muld(.5,.5,.5);
 				this.transformComponent.transform.translation.setv(mid);
 				
@@ -142,6 +151,7 @@ require(
 		var binderMdc = new MeshDataComponent(binder);
 
 		var binderMaterial = Material.createMaterial(ShaderLib.simpleLit);
+		// REVIEW: .uniforms is missing here.
 		binderMaterial.materialAmbient = [.6, .6, .6];
 
 		var binderMrc = new MeshRendererComponent();
@@ -172,6 +182,7 @@ require(
 			console.log(pickedList);
 			if (pickedList && pickedList.length) {
 				if(callback) callback(pickedList);
+				// REVIEW: maybe add a console.log if the callback is missing
 			}
 		}
 
@@ -185,6 +196,7 @@ require(
 			camera.getPickRay(x, y, width, height, ray)
 			picking.pickRay = ray
 
+			// REVIEW: accessing a private member
 			picking._process()
 		}
 
