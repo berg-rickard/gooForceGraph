@@ -9,8 +9,8 @@ define([
 	
 	var defaults = {
 		size: 1,
-		charge: 1e-4,
-		mass: 1,
+		charge: 5e-1,
+		mass: 1e-3,
 		friction: 0.05,
 		fixed: false
 	};
@@ -33,6 +33,10 @@ define([
 		this._acceleration = new Vector3();
 		this._velocity = new Vector3();
 		this.transform = new Transform();
+		this.transform.translation.setd(rnd(), rnd(), rnd());
+	}
+	function rnd() {
+		return (Math.random()-0.5)*5;
 	}
 
 
@@ -46,7 +50,7 @@ define([
 		fixed: 'fixed'
 	};
 
-	ForceGraphNode.prototype.update = function(tpf) {
+	ForceGraphNode.prototype.process = function(tpf) {
 		this._updateVelocity(tpf);
 		this._updatePosition(tpf);
 	};
@@ -59,13 +63,18 @@ define([
 	ForceGraphNode.prototype._updatePosition = function(tpf) {
 		var pos = this.transform.translation;
 		if(!this.fixed) {
-			if(this._velocity.lengthSquared() > 1e-8) {
+			if(this._velocity.lengthSquared() > 0.04 * 0.04) {
 				vec.setv(this._velocity).scale(tpf);
 				pos.addv(vec);
-				this.transform.update();
+				this.update();
 			}
 		}
 	};
+	
+	ForceGraphNode.prototype.update = function() {
+		this.transform.scale.setd(this.size, this.size, this.size);
+		this.transform.update();
+	}
 	
 	return ForceGraphNode;
 });

@@ -1,11 +1,11 @@
 define([
 	'goo/math/Vector3',
 	'ForceGraphNode',
-	'ForceGraphLink'
+	'ForceGraphLink',
 ],/** @lends */ function(
 	Vector3,
 	ForceGraphNode,
-	ForceGraphLink,
+	ForceGraphLink
 ) {
 	'use strict';
 	
@@ -19,7 +19,7 @@ define([
 	}
 	
 	var defaults = {
-		gravity: 10
+		gravity: 100
 	};
 	
 	var vec = new Vector3();
@@ -27,11 +27,11 @@ define([
 	/**
 	 * @class Creates a forcegraph structure, handling all data and calculations
 	 * @param {object|object[]} [data] The data tuples to be used in the forcegraph
-	 * @param {object} [mapping] How to map the data object to the forcegraph item properties
-	 * @param {string} [mapping.id='id']
-	 * @param {string} [mapping.size='size']
-	 * @param {string} [mapping.charg='charge']
-	 * @param {string} [mapping.mass='mass']
+	 * @param {object} [nodeMappine] How to map the data object to the forcegraph item properties
+	 * @param {string} [nodeMapping.id='id']
+	 * @param {string} [nodeMapping.size='size']
+	 * @param {string} [nodeMapping.charge='charge']
+	 * @param {string} [nodeMapping.mass='mass']
 	 */
 	function ForceGraph(data, nodeMapping, linkMapping, properties) {
 		fillDefaults(properties, defaults, this);
@@ -46,7 +46,6 @@ define([
 		this.linkData = [];
 		this.transforms = [];
 		this.inToOut = {};
-		this.outToIn = [];
 		
 		if(data instanceof Object) {
 			if (data.nodes) {
@@ -217,7 +216,7 @@ define([
 		for (var i = 0; i < iterations; i++) {
 			this._updateAcceleration();
 			for (var i = 0; i < this.nodeData.length; i++) {
-				this.nodeData[i].update();
+				this.nodeData[i].process(tpf);
 			}
 		}
 	};
@@ -237,7 +236,7 @@ define([
 			node = this.nodeData[i];
 			pos = node.transform.translation;
 			vec.setv(pos).invert();
-			if (vec.lengthSquared() > 0.04*0.04) {
+			if (vec.lengthSquared() > 16e-4) {
 				vec.normalize()
 			}
 			vec.scale(this.gravity);
@@ -255,13 +254,13 @@ define([
 				posB = nodeB.transform.translation;
 				
 				vec.setv(posB).subv(posA);
-				force = nodeA.charge * nodeB.charge / (vec.lengthSquared() * nodeA.mass);
+				force = nodeA.charge * nodeB.charge / (vec.lengthSquared() * nodeB.mass);
 				
 				vec.normalize();
 				vec.scale(force);
-				nodeA._acceleration.addv(vec);
-				vec.invert().scale(nodeA.mass / nodeB.mass);
 				nodeB._acceleration.addv(vec);
+				vec.invert().scale(nodeB.mass / nodeA.mass);
+				nodeA._acceleration.addv(vec);
 			}
 		}
 	};
@@ -271,18 +270,32 @@ define([
 		for (var i = 0; i < this.linkData.length; i++) {
 			nodeA = this.linkData[i].nodeA;
 			nodeB = this.linkData[i].nodeB;
+			
+			nodeA = this.nodeData[this.inToOut[nodeA]];
+			nodeB = this.nodeData[this.inToOut[nodeB]];
 			posA = nodeA.transform.translation;
 			posB = nodeB.transform.translation;
 
 			vec.setv(posA).subv(posB);
-			force = (this.linkData[i].length - vec.length()) * this.linkData[i].strengh;
+			force = (this.linkData[i].length - vec.length()) * this.linkData[i].strength;
 			vec.normalize();
 
 			vec.scale(force / nodeA.mass);
 			nodeA._acceleration.addv(vec);
 			vec.scale(nodeA.mass / nodeB.mass);
-			nodeB._acceleartion.addv(vec);
+			nodeB._acceleration.addv(vec);
 		}
+	}
+	
+	ForceGraph.prototype.getMatrixArray = function() {
+		var mats = [];
+		for (var i = 0; i < this.nodeData.length; i++) {
+			var data = this.nodeData[i].transform.matrix.data;
+			for (var j = 0; j < data.length; j++) {
+				mats.push(data[j]);
+			}
+		}
+		return mats;
 	}
 	
 	return ForceGraph

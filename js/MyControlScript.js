@@ -19,8 +19,7 @@ define(
 		if(!this.goingToLookAt.equals(this.lookAtPoint)) {
 			var delta = entity._world.tpf * 3;
 			var mid = this.middleStorage;
-			mid.setv(this.goingToLookAt).subv(this.lookAtPoint).muld(delta,delta,delta);
-			this.lookAtPoint.addv(mid);
+			this.lookAtPoint.lerp(this.goingToLookAt, delta)
 			this.dirty = true;
 		}
 		OrbitCamControlScript.prototype.run.call(this, entity);
