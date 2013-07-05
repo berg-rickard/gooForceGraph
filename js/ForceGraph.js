@@ -47,6 +47,9 @@ define([
 		this.transforms = [];
 		this.inToOut = {};
 		
+		this.nodeMin = [0,0,0];
+		this.nodeMax = [0,0,0];
+		
 		if(data instanceof Object) {
 			if (data.nodes) {
 				this.addNodes(data.nodes);
@@ -211,7 +214,7 @@ define([
 	};
 	
 	ForceGraph.prototype.process = function(tpf) {
-		var iterations = Math.ceil(tpf / 0.03);
+		var iterations = Math.ceil(tpf / 0.1);
 		tpf /= iterations;
 		for (var i = 0; i < iterations; i++) {
 			this._updateAcceleration();
@@ -219,7 +222,25 @@ define([
 				this.nodeData[i].process(tpf);
 			}
 		}
+		this.updateMinMax();
 	};
+	
+	ForceGraph.prototype.updateMinMax = function() {
+		this.nodeMin = [0,0,0];
+		this.nodeMax = [0,0,0];
+		var t;
+		for (var i = 0; i < this.nodeData.length; i++) {
+			t = this.nodeData[i].transform.translation.data;
+			if(t[0] < this.nodeMin[0]) this.nodeMin[0] = t[0] * 1.001;
+			else if (t[0] > this.nodeMax[0]) this.nodeMax[0] = t[0] * 1.001;
+
+			if(t[1] < this.nodeMin[1]) this.nodeMin[1] = t[1] * 1.001;
+			else if (t[1] > this.nodeMax[1]) this.nodeMax[1] = t[1] * 1.001;
+
+			if(t[2] < this.nodeMin[2]) this.nodeMin[2] = t[2] * 1.001;
+			else if (t[2] > this.nodeMax[2]) this.nodeMax[2] = t[2] * 1.001;
+		}
+	}
 	
 	ForceGraph.prototype._updateAcceleration = function() {
 		for (var i = 0; i < this.nodeData.length; i++) {
@@ -265,6 +286,68 @@ define([
 		}
 	};
 	
+	var depth = 5;
+	var pDepth = Math.pow(2, depth);
+	ForceGraph.prototype.__updateRepulsion = function() {
+		var tree = {};
+		var leaves = makeTree(tree, 8, depth);
+
+		var t, x, y, z;
+		var min = this.nodeMin;
+		var max = this.nodeMax;
+		var max_min = [
+			max[0]-min[0],
+			max[1]-min[1],
+			max[2]-min[2]
+		];
+		for (var i = this.nodeData.length - 1; i >= 0; i--) {
+			t = this.nodeData[i].transform.translation.data;
+			x = Math.floor((t[0] - min[0])/(max_min[0])*pDepth)
+			y = Math.floor((t[1] - min[1])/(max_min[1])*pDepth);
+			z = Math.floor((t[2] - min[2])/(max_min[2])*pDepth);
+			putInTree(this.nodeData[i], tree, x, y, z, depth)
+		}
+		var nodeData;
+		for (var i = leaves.length - 1; i >= 0; i--) {
+			for (var j = leaves[i].children.length - 1; j >= 0; j--) {
+				nodeData = leaves[i].children[j];
+				this._calcNode(nodeData, leaves[i]);
+			}
+		}
+	}
+
+	ForceGraph.prototype._calcNode = function(nodeData, branch, node) {
+		var acc = nodeData._acceleration;
+		var q1 = nodeData.charge;
+		var m = nodeData.mass;
+		var pos1 = nodeData.transform.translation;
+
+		var child, q2, pos2, force, mid = vec;
+		for (var i = branch.children.length - 1; i >= 0; i--) {
+			child = branch.children[i];
+			if (node && !child.charge || node === child || nodeData === child) continue;
+			
+			if (node) {
+				q2 = child.charge;
+				pos2 = child.center;
+				mid.setv(pos1).sub(pos2[0], pos2[1], pos2[2]);
+			} else {
+				q2 = child.charge;
+				pos2 = child.transform.translation;
+				mid.setv(pos1).subv(pos2);
+			}
+			force = q2*q1 / mid.lengthSquared();
+
+			mid.normalize();
+			mid.scale(force / m);
+			acc.addv(mid);
+		}
+		if (branch.parent) {
+			this._calcNode(nodeData, branch.parent, branch);
+		}
+	}
+	
+	
 	ForceGraph.prototype._updateAttraction = function() {
 		var nodeA, nodeB, posA, posB, force;
 		for (var i = 0; i < this.linkData.length; i++) {
@@ -296,6 +379,41 @@ define([
 			}
 		}
 		return mats;
+	}
+	
+	function makeTree(root, count, level, leaves) {
+		leaves || (leaves = []);
+		root.children || (root.children = []);
+		for(var i = 0; i < count; i++) {
+			var obj = {
+				center: [0,0,0],
+				charge: 0,
+				children: [],
+				parent: root
+			}
+			root.children.push(obj);
+			if(level > 1) makeTree(obj, count, level - 1, leaves);
+			else leaves.push(obj);
+		}
+		return leaves;
+	}
+
+	function putInTree(node, tree, x, y, z, level) {
+		var bx = x >> (level - 1);
+		var by = y >> (level - 1);
+		var bz = z >> (level - 1);
+		var branch = tree.children[bx << 2 | by << 1 | bz];
+		var t = node.transform.translation.data;
+		branch.center[0] = (branch.center[0] * branch.charge + t[0] * node.charge) / (branch.charge + node.charge);
+		branch.center[1] = (branch.center[1] * branch.charge + t[1] * node.charge) / (branch.charge + node.charge);
+		branch.center[2] = (branch.center[2] * branch.charge + t[2] * node.charge) / (branch.charge + node.charge);
+		branch.charge += node.charge;
+		
+		x ^= bx << (level - 1);
+		y ^= by << (level - 1);
+		z ^= bz << (level - 1);
+		if(level > 1) putInTree(node, branch, x, y, z, level - 1);
+		else branch.children.push(node);
 	}
 	
 	return ForceGraph
