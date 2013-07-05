@@ -30,7 +30,8 @@ function(
 	SimpleWorld.createTypicalRunner = function() {
 		var goo = new GooRunner({
 			showStats: true,
-			manuallyStartGameLoop: true
+			manuallyStartGameLoop: true,
+			antialias: true
 		});
 
 		// DOM
