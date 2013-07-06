@@ -11,7 +11,7 @@ require([
 		nodes: [],
 		links: []
 	};
-	for (var i = 0; i < 250; i++) {
+	for (var i = 0; i < 1000; i++) {
 		data.nodes.push({
 			id: 'asdf' + i,
 		});

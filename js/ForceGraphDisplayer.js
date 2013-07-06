@@ -109,7 +109,7 @@ define([
 	
 	ForceGraphDisplayer.prototype.update = function() {
 		this.material.shader.defines.NODE_COUNT = this.forceGraph.nodeData.length;
-		this.material.shader.uniforms.nodeMatrices = this.forceGraph.getMatrixArray();
+		this.material.uniforms.nodeTranslations = this.forceGraph.getTranslationsArray();
 	}
 	
 	var shaderDef = {
@@ -127,7 +127,8 @@ define([
 		uniforms : {
 			viewProjectionMatrix : Shader.VIEW_PROJECTION_MATRIX,
 			worldMatrix : Shader.WORLD_MATRIX,
-			cameraPosition : Shader.CAMERA
+			cameraPosition : Shader.CAMERA,
+			nodeTranslations : []
 		},
 		vshader : [ //
 		'attribute vec3 vertexPosition;', //
@@ -137,7 +138,7 @@ define([
 		'uniform mat4 viewProjectionMatrix;',
 		'uniform mat4 worldMatrix;',//
 		'uniform vec3 cameraPosition;', //
-		'uniform mat4 nodeMatrices[NODE_COUNT];',
+		'uniform vec3 nodeTranslations[NODE_COUNT];',
 
 		ShaderBuilder.light.prevertex,
 
@@ -146,7 +147,8 @@ define([
 		'varying vec3 viewPosition;',
 
 		'void main(void) {', //
-		'	vec4 worldPos = worldMatrix * nodeMatrices[int(nodeId)] * vec4(vertexPosition, 1.0);', //
+		' vec3 pos = vertexPosition + nodeTranslations[int(nodeId)];',
+		'	vec4 worldPos = vec4(pos, 1.0);', //
 		'	vWorldPos = worldPos.xyz;',
 		'	gl_Position = viewProjectionMatrix * worldPos;', //
 

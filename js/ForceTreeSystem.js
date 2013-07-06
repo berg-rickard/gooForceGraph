@@ -42,7 +42,7 @@ define(
 	*/
 	
 	ForceTreeSystem.prototype.process = function (entities, tpf) {
-		var iterations = Math.ceil(tpf / 0.03);
+		var iterations = Math.ceil(tpf / 0.05);
 		tpf /= iterations;
 		for (var j = 0; j < iterations; j++) {
 			this._updateAcceleration(entities);

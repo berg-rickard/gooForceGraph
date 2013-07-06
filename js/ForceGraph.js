@@ -23,6 +23,8 @@ define([
 	};
 	
 	var vec = new Vector3();
+	var depth = 4;
+	var pDepth = Math.pow(2, depth);
 
 	/**
 	 * @class Creates a forcegraph structure, handling all data and calculations
@@ -49,6 +51,8 @@ define([
 		
 		this.nodeMin = [0,0,0];
 		this.nodeMax = [0,0,0];
+		this._tree = {};
+		this._buildTree(this._tree, 8, depth);
 		
 		if(data instanceof Object) {
 			if (data.nodes) {
@@ -214,7 +218,7 @@ define([
 	};
 	
 	ForceGraph.prototype.process = function(tpf) {
-		var iterations = Math.ceil(tpf / 0.1);
+		var iterations = Math.ceil(tpf / 0.03);
 		tpf /= iterations;
 		for (var i = 0; i < iterations; i++) {
 			this._updateAcceleration();
@@ -266,31 +270,63 @@ define([
 	};
 	
 	ForceGraph.prototype._updateRepulsion = function() {
-		var nodeA, nodeB, posA, posB, force;
+		var nodeA, nodeB, posA, posB, force, inv, len, lenSq;
+		var vd = vec.data;
 		for (var i = this.nodeData.length - 1; i >= 0; i--) {
+			nodeA = this.nodeData[i];
+			posA = nodeA.transform.translation;
+
 			for (var j = i - 1; j >= 0; j--) {
-				nodeA = this.nodeData[i];
+
 				nodeB = this.nodeData[j];
-				posA = nodeA.transform.translation;
 				posB = nodeB.transform.translation;
 				
-				vec.setv(posB).subv(posA);
-				force = nodeA.charge * nodeB.charge / (vec.lengthSquared() * nodeB.mass);
+				// vec.setv(posB).subv(posA)
+				vd[0] = posB.data[0] - posA.data[0];
+				vd[1] = posB.data[1] - posA.data[1];
+				vd[2] = posB.data[2] - posA.data[2];
 				
-				vec.normalize();
-				vec.scale(force);
-				nodeB._acceleration.addv(vec);
-				vec.invert().scale(nodeB.mass / nodeA.mass);
-				nodeA._acceleration.addv(vec);
+				// lenSq = vec.lengthSquared()
+				lenSq = vd[0] * vd[0] + vd[1] * vd[1] + vd[2] * vd[2];
+				if (lenSq > 1e2) continue;
+				
+				force = nodeA.charge * nodeB.charge / (lenSq * nodeB.mass);
+				if (force < 1e-4) continue;
+				
+				// vec.normalize()
+				len = Math.sqrt(lenSq);
+				vd[0] /= len;
+				vd[1] /= len;
+				vd[2] /= len;
+				
+				// vec.scale(force);
+				vec.data[0] *= force;
+				vec.data[1] *= force;
+				vec.data[2] *= force;
+				
+				// node._acceleration.addv(vec)
+				nodeB._acceleration.data[0] += vec.data[0];
+				nodeB._acceleration.data[1] += vec.data[1];
+				nodeB._acceleration.data[2] += vec.data[2];
+				
+				inv = -nodeB.mass / nodeA.mass;
+				
+				// vec.scale(inv)
+				vec.data[0] *= inv;
+				vec.data[1] *= inv;
+				vec.data[2] *= inv;
+
+				// nodeA._acceleration.addv(vec);
+				nodeA._acceleration.data[0] += vec.data[0];
+				nodeA._acceleration.data[1] += vec.data[1];
+				nodeA._acceleration.data[2] += vec.data[2];
 			}
 		}
 	};
 	
-	var depth = 5;
-	var pDepth = Math.pow(2, depth);
 	ForceGraph.prototype.__updateRepulsion = function() {
-		var tree = {};
-		var leaves = makeTree(tree, 8, depth);
+		this._clearTree(this._tree);
+		var tree = this._tree;
 
 		var t, x, y, z;
 		var min = this.nodeMin;
@@ -308,42 +344,37 @@ define([
 			putInTree(this.nodeData[i], tree, x, y, z, depth)
 		}
 		var nodeData;
-		for (var i = leaves.length - 1; i >= 0; i--) {
-			for (var j = leaves[i].children.length - 1; j >= 0; j--) {
-				nodeData = leaves[i].children[j];
-				this._calcNode(nodeData, leaves[i]);
-			}
+		for (var j = this.nodeData.length - 1; j >= 0; j--) {
+			nodeData = this.nodeData[j];
+			this._calcNode(nodeData, tree);
 		}
 	}
 
 	ForceGraph.prototype._calcNode = function(nodeData, branch, node) {
-		var acc = nodeData._acceleration;
-		var q1 = nodeData.charge;
-		var m = nodeData.mass;
-		var pos1 = nodeData.transform.translation;
-
-		var child, q2, pos2, force, mid = vec;
+		var child, c, force, lensq;
 		for (var i = branch.children.length - 1; i >= 0; i--) {
-			child = branch.children[i];
-			if (node && !child.charge || node === child || nodeData === child) continue;
-			
-			if (node) {
-				q2 = child.charge;
-				pos2 = child.center;
-				mid.setv(pos1).sub(pos2[0], pos2[1], pos2[2]);
+			if(branch.children[i] instanceof ForceGraphNode) {
+				if(branch.children[i] === nodeData) {
+					continue;
+				}
+				child = branch.children[i];
+				c = child.transform.translation;
+				vec.setv(nodeData.transform.translation).subv(c);
+			} else if(branch.children[i].descendants.indexOf(nodeData) > -1) {
+				this._calcNode(nodeData, branch.children[i]);
+				continue;
+			} else if(branch.children[i].charge === 0) {
+				continue;
 			} else {
-				q2 = child.charge;
-				pos2 = child.transform.translation;
-				mid.setv(pos1).subv(pos2);
+				child = branch.children[i];
+				c = branch.children[i].center;
+				vec.setv(nodeData.transform.translation).sub_d(c[0], c[1], c[2]);
 			}
-			force = q2*q1 / mid.lengthSquared();
-
-			mid.normalize();
-			mid.scale(force / m);
-			acc.addv(mid);
-		}
-		if (branch.parent) {
-			this._calcNode(nodeData, branch.parent, branch);
+			lensq = vec.lengthSquared();
+			force = nodeData.charge * child.charge / lensq;
+			vec.normalize();
+			vec.scale(force / nodeData.mass);
+			nodeData._acceleration.addv(vec);
 		}
 	}
 	
@@ -370,32 +401,46 @@ define([
 		}
 	}
 	
-	ForceGraph.prototype.getMatrixArray = function() {
-		var mats = [];
+	ForceGraph.prototype.getTranslationsArray = function() {
+		var trans = [];
 		for (var i = 0; i < this.nodeData.length; i++) {
-			var data = this.nodeData[i].transform.matrix.data;
+			var data = this.nodeData[i].transform.translation.data;
 			for (var j = 0; j < data.length; j++) {
-				mats.push(data[j]);
+				trans.push(data[j]);
 			}
 		}
-		return mats;
+		return trans;
 	}
 	
-	function makeTree(root, count, level, leaves) {
-		leaves || (leaves = []);
+	ForceGraph.prototype._buildTree = function(root, count, level) {
 		root.children || (root.children = []);
 		for(var i = 0; i < count; i++) {
 			var obj = {
 				center: [0,0,0],
 				charge: 0,
 				children: [],
-				parent: root
+				parent: root,
+				descendants: []
 			}
 			root.children.push(obj);
-			if(level > 1) makeTree(obj, count, level - 1, leaves);
-			else leaves.push(obj);
+			if(level > 1) this._buildTree(obj, count, level - 1);
 		}
-		return leaves;
+	}
+	ForceGraph.prototype._clearTree = function(branch) {
+		var child;
+		for (var i = branch.children.length - 1; i >= 0; i--) {
+			child = branch.children[i];
+			child.descendants = [];
+			child.center[0] = 0;
+			child.center[1] = 0;
+			child.center[2] = 0;
+			child.charge = 0;
+			if (child.children.length && child.children[0] instanceof ForceGraphNode) {
+				child.children = [];
+			} else {
+				this._clearTree(child);
+			}
+		}
 	}
 
 	function putInTree(node, tree, x, y, z, level) {
@@ -414,6 +459,7 @@ define([
 		z ^= bz << (level - 1);
 		if(level > 1) putInTree(node, branch, x, y, z, level - 1);
 		else branch.children.push(node);
+		branch.descendants.push(node);
 	}
 	
 	return ForceGraph
