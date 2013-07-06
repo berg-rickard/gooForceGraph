@@ -35,6 +35,8 @@ define([
 ) {
 	'use strict';
 	
+	var nodesPerMesh = 500;
+	
 	function ForceGraphDisplayer(forceGraph) {
 		var goo = new GooRunner({
 			showStats: true,
@@ -72,9 +74,9 @@ define([
 		
 		
 		// General material
-		this.material = Material.createMaterial(shaderDef, 'ForceGraphMaterial');
 		
-		this.entities = [];
+		this.nodeEntities = [];
+		this.linkEntities = [];
 		this.goo = goo;
 		this.forceGraph = forceGraph;
 		this.update();
@@ -87,37 +89,39 @@ define([
 	}
 	
 	ForceGraphDisplayer.prototype.rebuild = function() {
-		var meshes = ForceGraphMesh.build(this.forceGraph);
+		var meshes = ForceGraphMesh.buildNodes(this.forceGraph.nodeData, nodesPerMesh);
 		for(var i = 0; i < meshes.length; i++) {
-			if (i < this.entities.length) {
+			if (i < this.nodeEntities.length) {
 				//Reuse entity
-				this.entities[i].meshDataComponent.meshData = meshes[i];
+				this.nodeEntities[i].meshDataComponent.meshData = meshes[i];
 			} else {
 				// Add new entity
 				var entity = EntityUtils.createTypicalEntity(this.goo.world, meshes[i], 'ForceGraphEntity_'+i);
-				entity.meshRendererComponent.materials[0] = this.material;
-				this.entities.push(entity);
+				entity.meshRendererComponent.materials[0] = Material.createMaterial(nodeShaderDef, 'ForceGraphNodeMaterial_'+i);
+				this.nodeEntities.push(entity);
 				entity.addToWorld();
 			}
 		}
-		while (meshes.length < this.entities.length) {
+		while (meshes.length < this.nodeEntities.length) {
 			// Remove unused entities
-			var entity = this.entities.pop();
+			var entity = this.nodeEntities.pop();
 			entity.removeFromWorld();
 		}
 	};
 	
 	ForceGraphDisplayer.prototype.update = function() {
-		this.material.shader.defines.NODE_COUNT = this.forceGraph.nodeData.length;
-		this.material.uniforms.nodeTranslations = this.forceGraph.getTranslationsArray();
+		var translations = this.forceGraph.getTranslationArrays(nodesPerMesh);
+		for (var i = this.nodeEntities.length - 1; i >= 0; i--) {
+			this.nodeEntities[i].meshRendererComponent.materials[0].uniforms.nodeTranslations = translations[i];
+		}
 	}
 	
-	var shaderDef = {
+	var nodeShaderDef = {
 		processors: [
 			ShaderBuilder.light.processor
 		],
 		defines: {
-			NODE_COUNT: 4
+			NODE_COUNT: nodesPerMesh
 		},
 		attributes : {
 			vertexPosition : MeshData.POSITION,

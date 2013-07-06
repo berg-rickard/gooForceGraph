@@ -218,7 +218,7 @@ define([
 	};
 	
 	ForceGraph.prototype.process = function(tpf) {
-		var iterations = Math.ceil(tpf / 0.03);
+		var iterations = Math.ceil(tpf / 0.05);
 		tpf /= iterations;
 		for (var i = 0; i < iterations; i++) {
 			this._updateAcceleration();
@@ -401,15 +401,26 @@ define([
 		}
 	}
 	
-	ForceGraph.prototype.getTranslationsArray = function() {
+	ForceGraph.prototype.getTranslationArrays = function(idsPerMesh) {
+		var arrays = [];
 		var trans = [];
+		var c = 0;
 		for (var i = 0; i < this.nodeData.length; i++) {
-			var data = this.nodeData[i].transform.translation.data;
-			for (var j = 0; j < data.length; j++) {
-				trans.push(data[j]);
+			var d = this.nodeData[i].transform.translation.data;
+			trans[c] = d[0];
+			trans[c+1] = d[1];
+			trans[c+2] = d[2];
+			c += 3;
+			if(i > 0 && i % idsPerMesh === 0) {
+				arrays.push(trans);
+				trans = [];
+				c = 0;
 			}
 		}
-		return trans;
+		if (trans.length) {
+			arrays.push(trans);
+		}
+		return arrays;
 	}
 	
 	ForceGraph.prototype._buildTree = function(root, count, level) {

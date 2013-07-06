@@ -15,22 +15,38 @@ define([
 	}
 	var transform = new Transform();
 	
-	ForceGraphMesh.build = function(forceGraph) {
-		var nodeData = forceGraph.nodeData;
-		var linkData = forceGraph.linkData;
+	ForceGraphMesh.buildNodes = function(nodeData, nodesPerMesh) {
 		var meshBuilder = new MeshBuilder();
-		var mesh, a, b;
+		var mesh
+		var meshDatas = [];
 		for (var i = 0; i < nodeData.length; i++) {
 			mesh = new ForceGraphSphere(i);
 			meshBuilder.addMeshData(mesh, transform);
+			if (i !== 0 && i % nodesPerMesh === 0) {
+				meshDatas = meshDatas.concat(meshBuilder.build());
+				meshBuilder = new MeshBuilder();	
+			}
 		}
+		meshDatas = meshDatas.concat(meshBuilder.build());
+		return meshDatas;
+	};
+	
+	ForceGraphMesh.buildLinks = function(linkData, linksPerMesh) {
+		var meshBuilder = new MeshBuilder();
+		var meshDatas = [];
+		var mesh, a, b;
 		for (var i = 0; i < linkData.length; i++) {
 			a = forceGraph.inToOut[linkData[i].nodeA];
 			b = forceGraph.inToOut[linkData[i].nodeB];
 			mesh = new ForceGraphLine(a, b);
 			meshBuilder.addMeshData(mesh, transform);
+			if (i !== 0 && i % nodesPerMesh === 0) {
+				meshDatas = meshDAtas.concat(meshBuilder.build());
+				meshBuilder = new MeshBuilder();
+			}
 		}
-		return meshBuilder.build();
+		meshDatas = meshDatas.concat(meshBuilder.build());
+		return meshDatas;
 	};
 	
 	return ForceGraphMesh;
