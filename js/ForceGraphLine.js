@@ -18,6 +18,7 @@ define([
 		var attributeMap = MeshData.defaultMap([MeshData.POSITION]);
 		attributeMap['NODE_ID'] = MeshData.createAttribute(1, 'Short');
 		MeshData.call(this, attributeMap, 2, 2);
+		this.indexModes = ['Lines'];
 		this.rebuild();
 	}
 	ForceGraphLine.prototype = Object.create(MeshData.prototype);
@@ -29,11 +30,12 @@ define([
 	}
 	
 	ForceGraphLine.prototype.rebuild = function() {
-		var nbuf = this.getAttributeBuffer('NODE_ID');
-		nbuf[0] = this.nodeA;
-		nbuf[1] = this.nodeB;
-		
-		var vBuf = this.getAttributeBuffer(MeshData.POSITION);
+		this.getAttributeBuffer('NODE_ID').set([this.nodeA, this.nodeB]);
+		this.getAttributeBuffer(MeshData.POSITION).set([
+			0, 0, 0,
+			0, 0, 0
+		]);
+		this.getIndexBuffer().set([0, 1]);
 	}
 	
 	return ForceGraphLine;

@@ -8,11 +8,12 @@ define([
 	'use strict';
 	
 	var defaults = {
-		size: 1,
+		size: 1.1,
 		charge: 5e-1,
 		mass: 1e-3,
-		friction: 0.05,
-		fixed: false
+		friction: 0.07,
+		fixed: false,
+		color: [1, 1, 1]
 	};
 		
 	var vec = new Vector3();
@@ -36,7 +37,7 @@ define([
 		this.transform.translation.setd(rnd(), rnd(), rnd());
 	}
 	function rnd() {
-		return (Math.random()-0.5)*5;
+		return (Math.random()-0.5)*50;
 	}
 
 
@@ -47,7 +48,8 @@ define([
 		charge: 'charge',
 		mass: 'mass',
 		friction: 'friction',
-		fixed: 'fixed'
+		fixed: 'fixed',
+		color: 'color'
 	};
 
 	ForceGraphNode.prototype.process = function(tpf) {

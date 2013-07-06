@@ -218,7 +218,7 @@ define([
 	};
 	
 	ForceGraph.prototype.process = function(tpf) {
-		var iterations = Math.ceil(tpf / 0.05);
+		var iterations = Math.ceil(tpf / 0.01);
 		tpf /= iterations;
 		for (var i = 0; i < iterations; i++) {
 			this._updateAcceleration();
@@ -288,10 +288,10 @@ define([
 				
 				// lenSq = vec.lengthSquared()
 				lenSq = vd[0] * vd[0] + vd[1] * vd[1] + vd[2] * vd[2];
-				if (lenSq > 1e2) continue;
+				if (lenSq > 1e4) continue;
 				
 				force = nodeA.charge * nodeB.charge / (lenSq * nodeB.mass);
-				if (force < 1e-4) continue;
+				if (force < 1e-6) continue;
 				
 				// vec.normalize()
 				len = Math.sqrt(lenSq);
@@ -396,7 +396,7 @@ define([
 
 			vec.scale(force / nodeA.mass);
 			nodeA._acceleration.addv(vec);
-			vec.scale(nodeA.mass / nodeB.mass);
+			vec.scale(- nodeA.mass / nodeB.mass);
 			nodeB._acceleration.addv(vec);
 		}
 	}

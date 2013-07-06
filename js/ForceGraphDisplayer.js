@@ -35,7 +35,7 @@ define([
 ) {
 	'use strict';
 	
-	var nodesPerMesh = 500;
+	var nodesPerMesh = 300;
 	
 	function ForceGraphDisplayer(forceGraph) {
 		var goo = new GooRunner({
@@ -66,8 +66,8 @@ define([
 	
 		/* Use orbitcam */
 		scriptComponent.scripts.push(new MyControlScript({
-			spherical: new Vector3(50, 0,0),
-			baseDistance: 50 / 4,
+			spherical: new Vector3(150, 0,0),
+			baseDistance: 150 / 4,
 			domElement: goo.renderer.domElement
 		}));
 		cameraEntity.setComponent(scriptComponent);
@@ -89,32 +89,88 @@ define([
 	}
 	
 	ForceGraphDisplayer.prototype.rebuild = function() {
-		var meshes = ForceGraphMesh.buildNodes(this.forceGraph.nodeData, nodesPerMesh);
-		for(var i = 0; i < meshes.length; i++) {
-			if (i < this.nodeEntities.length) {
-				//Reuse entity
-				this.nodeEntities[i].meshDataComponent.meshData = meshes[i];
+		// Nodes
+		var meshes = ForceGraphMesh.buildNodes(this.forceGraph, nodesPerMesh);
+		this._rebuild(meshes, this.nodeEntities, nodeShaderDef, 'Node');
+		
+		// Links
+		var meshes = ForceGraphMesh.buildLinks(this.forceGraph, nodesPerMesh);
+		//this._rebuild(meshes, this.linkEntities, linkShaderDef, 'Link');
+	};
+	
+	ForceGraphDisplayer.prototype._rebuild = function(meshes, entities, shaderDef, name) {
+		for (var i = 0; i < meshes.length; i++) {
+			if (i < entities.length) {
+				// Reuse entity
+				entities[i].meshDataComponent.meshData = meshes[i];
 			} else {
 				// Add new entity
-				var entity = EntityUtils.createTypicalEntity(this.goo.world, meshes[i], 'ForceGraphEntity_'+i);
-				entity.meshRendererComponent.materials[0] = Material.createMaterial(nodeShaderDef, 'ForceGraphNodeMaterial_'+i);
-				this.nodeEntities.push(entity);
+				var entity = EntityUtils.createTypicalEntity(this.goo.world, meshes[i], 'ForceGraph'+name+'Entity_'+i);
+				entity.meshRendererComponent.materials[0] = Material.createMaterial(shaderDef, 'ForceGraph'+name+'Material_'+i);
+				entity.meshRendererComponent.cullMode = 'Never';
+				entities.push(entity);
 				entity.addToWorld();
 			}
 		}
-		while (meshes.length < this.nodeEntities.length) {
+		while (meshes.length < this.linkEntities.length) {
 			// Remove unused entities
-			var entity = this.nodeEntities.pop();
+			var entity = entities.pop();
 			entity.removeFromWorld();
 		}
-	};
+	}
+	
 	
 	ForceGraphDisplayer.prototype.update = function() {
-		var translations = this.forceGraph.getTranslationArrays(nodesPerMesh);
+		var translations = this.getUniforms('translation', nodesPerMesh);
+		var scales = this.getUniforms('scale', nodesPerMesh);
+		var colors = this.getUniforms('color', nodesPerMesh);
+		var uniforms;
 		for (var i = this.nodeEntities.length - 1; i >= 0; i--) {
-			this.nodeEntities[i].meshRendererComponent.materials[0].uniforms.nodeTranslations = translations[i];
+			uniforms = this.nodeEntities[i].meshRendererComponent.materials[0].uniforms;
+			uniforms.nodeTranslations = translations[i];
+			uniforms.nodeScales = scales[i];
+			uniforms.nodeColors = colors[i];
+		}
+		var translations = this.getUniforms('translation', 1e5);
+		for (var i = this.linkEntities.length - 1; i >= 0; i--) {
+			this.linkEntities[i].meshRendererComponent.materials[0].uniforms.nodeTranslations = translations[0];
 		}
 	}
+	
+	ForceGraphDisplayer.prototype.getUniforms = function(type, idsPerMesh) {
+		var nodeData = this.forceGraph.nodeData;
+		var arrays = [];
+		var trans = [];
+		var c = 0;
+		var len, d;
+		for (var i = 0; i < nodeData.length; i++) {
+			if (type === 'translation') {
+				d = nodeData[i].transform.translation.data;
+				len = 3;
+			} else if (type === 'scale') {
+				d = [nodeData[i].size];
+				len = 1;
+			} else if (type === 'color') {
+				d = nodeData[i].color;
+				len = 3;
+			} else {
+				return null;
+			}
+			for (var j = 0; j < len; j++) {
+				trans.push(d[j]);
+			}
+			c += len;
+			if(i > 0 && i % idsPerMesh === 0) {
+				arrays.push(trans);
+				trans = [];
+				c = 0;
+			}
+		}
+		if (trans.length) {
+			arrays.push(trans);
+		}
+		return arrays;
+	};
 	
 	var nodeShaderDef = {
 		processors: [
@@ -132,7 +188,9 @@ define([
 			viewProjectionMatrix : Shader.VIEW_PROJECTION_MATRIX,
 			worldMatrix : Shader.WORLD_MATRIX,
 			cameraPosition : Shader.CAMERA,
-			nodeTranslations : []
+			nodeTranslations : [],
+			nodeScales : [],
+			nodeColors : []
 		},
 		vshader : [ //
 		'attribute vec3 vertexPosition;', //
@@ -143,16 +201,21 @@ define([
 		'uniform mat4 worldMatrix;',//
 		'uniform vec3 cameraPosition;', //
 		'uniform vec3 nodeTranslations[NODE_COUNT];',
+		'uniform vec3 nodeColors[NODE_COUNT];',
+		'uniform float nodeScales[NODE_COUNT];',
 
 		ShaderBuilder.light.prevertex,
 
 		'varying vec3 normal;',//
+		'varying vec3 color;',
 		'varying vec3 vWorldPos;',
 		'varying vec3 viewPosition;',
 
 		'void main(void) {', //
-		' vec3 pos = vertexPosition + nodeTranslations[int(nodeId)];',
-		'	vec4 worldPos = vec4(pos, 1.0);', //
+		' int id = int(nodeId);',
+		' color = nodeColors[id];',
+		' vec3 newpos = vertexPosition * nodeScales[id] + nodeTranslations[id];',
+		'	vec4 worldPos = vec4(newpos, 1.0);', //
 		'	vWorldPos = worldPos.xyz;',
 		'	gl_Position = viewProjectionMatrix * worldPos;', //
 
@@ -170,14 +233,53 @@ define([
 		'varying vec3 normal;',//
 		'varying vec3 vWorldPos;',
 		'varying vec3 viewPosition;',
+		'varying vec3 color;',
 
 		'void main(void)',//
 		'{',//
 		'	vec3 N = normalize(normal);',//
-		'	vec4 final_color = vec4(1.0);',//
+		'	vec4 final_color = vec4(color, 1.0);',//
 
 			ShaderBuilder.light.fragment,
 
+		'	gl_FragColor = final_color;',//
+		'}'//
+		].join('\n')
+	};
+	
+	var linkShaderDef = {
+		defines: {
+			NODE_COUNT: 10
+		},
+		attributes : {
+			vertexPosition : MeshData.POSITION,
+			nodeId : 'NODE_ID'
+		},
+		uniforms : {
+			viewProjectionMatrix : Shader.VIEW_PROJECTION_MATRIX,
+			worldMatrix : Shader.WORLD_MATRIX,
+			nodeTranslations : []
+		},
+		vshader : [ //
+		'attribute vec3 vertexPosition;', //
+		'attribute float nodeId;', //
+
+		'uniform mat4 viewProjectionMatrix;',
+		'uniform mat4 worldMatrix;',//
+		'uniform vec3 nodeTranslations[NODE_COUNT];',
+
+		'void main(void) {', //
+		' vec3 pos = vertexPosition + nodeTranslations[int(nodeId)];',
+		'	vec4 worldPos = vec4(pos, 1.0);', //
+		'	gl_Position = viewProjectionMatrix * worldPos;', //
+		'}'//
+		].join('\n'),
+		fshader : [//
+		'precision mediump float;',//
+
+		'void main(void)',//
+		'{',//
+		'	vec4 final_color = vec4(1.0);',//
 		'	gl_FragColor = final_color;',//
 		'}'//
 		].join('\n')

@@ -6,8 +6,8 @@ define([
 	'use strict';
 	
 	var defaults = {
-		length: 50,
-		strength: 10,
+		length: 10,
+		strength: 0.1,
 		nodeA: null,
 		nodeB: null
 	}
