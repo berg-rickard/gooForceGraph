@@ -8,15 +8,14 @@ define([
 	 * @class The mesh for the force graph links
 	 * @extends MeshData
 	 */
-	function ForceGraphLine(nodeA, nodeB) {
-		this.nodeA = nodeA;
-		this.nodeB = nodeB;
+	function ForceGraphLine(linkIndex) {
+		this.linkIndex = linkIndex;
 	
 	
 		MeshData.call(this);
 		
 		var attributeMap = MeshData.defaultMap([MeshData.POSITION]);
-		attributeMap['NODE_ID'] = MeshData.createAttribute(1, 'Short');
+		attributeMap['LINK_ID'] = MeshData.createAttribute(1, 'Short');
 		MeshData.call(this, attributeMap, 2, 2);
 		this.indexModes = ['Lines'];
 		this.rebuild();
@@ -30,7 +29,7 @@ define([
 	}
 	
 	ForceGraphLine.prototype.rebuild = function() {
-		this.getAttributeBuffer('NODE_ID').set([this.nodeA, this.nodeB]);
+		this.getAttributeBuffer('LINK_ID').set([this.linkIndex * 2, this.linkIndex * 2 + 1]);
 		this.getAttributeBuffer(MeshData.POSITION).set([
 			0, 0, 0,
 			0, 0, 0

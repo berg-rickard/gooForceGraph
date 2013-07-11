@@ -7,15 +7,6 @@ define([
 ) {
 	'use strict';
 	
-	var defaults = {
-		size: 1.1,
-		charge: 5e-1,
-		mass: 1e-3,
-		friction: 0.07,
-		fixed: false,
-		color: [1, 1, 1]
-	};
-		
 	var vec = new Vector3();
 	/**
 	 * @class A node in the Force graph
@@ -26,30 +17,29 @@ define([
 	 * @param {string} [mapping.charg='charge']
 	 * @param {string} [mapping.mass='mass']
 	 */
-	function ForceGraphNode(data, mapping) {
-		mapping = mapping || ForceGraphNode.defaultMapping;
-		for (var key in defaults) {
-			this[key] = (data[mapping[key]] !== undefined) ? data[mapping[key]] : defaults[key];
+	function ForceGraphNode(data) {
+		for (var key in ForceGraphNode.defaults) {
+			this[key] = (data[key] !== undefined) ? data[key] : ForceGraphNode.defaults[key];
 		}
-		this._acceleration = new Vector3();
-		this._velocity = new Vector3();
-		this.transform = new Transform();
-		this.transform.translation.setd(rnd(), rnd(), rnd());
+		this._acceleration = new Float32Array(3);
+		this._velocity = new Float32Array(3);
+		this.position = new Float32Array(3);
+		this.position.set([rnd(), rnd(), rnd()]);
+		//this.gridIndex = [0,0,0];
 	}
 	function rnd() {
-		return (Math.random()-0.5)*50;
+		return (Math.random()-0.5)*250;
 	}
 
 
 	
-	ForceGraphNode.defaultMapping = {
-		id: 'id',
-		size: 'size',
-		charge: 'charge',
-		mass: 'mass',
-		friction: 'friction',
-		fixed: 'fixed',
-		color: 'color'
+	ForceGraphNode.defaults = {
+		size: 1.1,
+		charge: 5e-1,
+		mass: 1e-6,
+		friction: 0.03,
+		fixed: false,
+		color: [1, 1, 1]
 	};
 
 	ForceGraphNode.prototype.process = function(tpf) {
@@ -58,25 +48,30 @@ define([
 	};
 	
 	ForceGraphNode.prototype._updateVelocity = function(tpf) {
-		vec.setv(this._acceleration).scale(tpf);
-		this._velocity.addv(vec).scale(1 - this.friction);
+		var v = this._velocity;
+		var a = this._acceleration;
+
+		v[0] += a[0] * tpf;
+		v[1] += a[1] * tpf;
+		v[2] += a[2] * tpf;
+		
+		v[0] *= 1 - this.friction;
+		v[1] *= 1 - this.friction;
+		v[2] *= 1 - this.friction;
 	};
 	
 	ForceGraphNode.prototype._updatePosition = function(tpf) {
-		var pos = this.transform.translation;
+		var p = this.position;
+		var v = this._velocity;
 		if(!this.fixed) {
-			if(this._velocity.lengthSquared() > 0.04 * 0.04) {
-				vec.setv(this._velocity).scale(tpf);
-				pos.addv(vec);
-				this.update();
+			var lenSq = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+			if(lenSq > 16e-4) {
+				p[0] += v[0] * tpf;
+				p[1] += v[1] * tpf;
+				p[2] += v[2] * tpf;
 			}
 		}
 	};
-	
-	ForceGraphNode.prototype.update = function() {
-		this.transform.scale.setd(this.size, this.size, this.size);
-		this.transform.update();
-	}
 	
 	return ForceGraphNode;
 });

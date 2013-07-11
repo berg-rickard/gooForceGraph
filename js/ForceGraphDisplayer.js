@@ -40,7 +40,7 @@ define([
 	function ForceGraphDisplayer(forceGraph) {
 		var goo = new GooRunner({
 			showStats: true,
-			//manuallyStartGameLoop: true,
+			manuallyStartGameLoop: true,
 			antialias: true
 		});
 		
@@ -58,7 +58,7 @@ define([
 	
 		// Camera
 		var cameraEntity = goo.world.createEntity("CameraEntity");
-		cameraEntity.setComponent(new CameraComponent(new Camera(45, 1, 1, 1000)));
+		cameraEntity.setComponent(new CameraComponent(new Camera(45, 1, 10, 10000)));
 		cameraEntity.addToWorld();
 	
 		// Camera control
@@ -66,8 +66,8 @@ define([
 	
 		/* Use orbitcam */
 		scriptComponent.scripts.push(new MyControlScript({
-			spherical: new Vector3(150, 0,0),
-			baseDistance: 150 / 4,
+			spherical: new Vector3(650, Math.PI / 3, Math.PI/12),
+			baseDistance: 250 / 4,
 			domElement: goo.renderer.domElement
 		}));
 		cameraEntity.setComponent(scriptComponent);
@@ -80,7 +80,10 @@ define([
 		this.goo = goo;
 		this.forceGraph = forceGraph;
 		this.update();
-		this.rebuild();
+		this.rebuildNodes();
+		this.rebuildLinks();
+		
+		goo.startGameLoop();
 		
 		goo.callbacks.push(function(tpf) {
 			this.forceGraph.process(tpf);
@@ -88,14 +91,14 @@ define([
 		}.bind(this));
 	}
 	
-	ForceGraphDisplayer.prototype.rebuild = function() {
-		// Nodes
+	ForceGraphDisplayer.prototype.rebuildNodes = function() {
 		var meshes = ForceGraphMesh.buildNodes(this.forceGraph, nodesPerMesh);
 		this._rebuild(meshes, this.nodeEntities, nodeShaderDef, 'Node');
-		
-		// Links
+	};
+	
+	ForceGraphDisplayer.prototype.rebuildLinks = function() {
 		var meshes = ForceGraphMesh.buildLinks(this.forceGraph, nodesPerMesh);
-		//this._rebuild(meshes, this.linkEntities, linkShaderDef, 'Link');
+		this._rebuild(meshes, this.linkEntities, linkShaderDef, 'Link');
 	};
 	
 	ForceGraphDisplayer.prototype._rebuild = function(meshes, entities, shaderDef, name) {
@@ -107,6 +110,7 @@ define([
 				// Add new entity
 				var entity = EntityUtils.createTypicalEntity(this.goo.world, meshes[i], 'ForceGraph'+name+'Entity_'+i);
 				entity.meshRendererComponent.materials[0] = Material.createMaterial(shaderDef, 'ForceGraph'+name+'Material_'+i);
+				entity.meshRendererComponent.materials[0].uniforms.offset = i;
 				entity.meshRendererComponent.cullMode = 'Never';
 				entities.push(entity);
 				entity.addToWorld();
@@ -131,9 +135,9 @@ define([
 			uniforms.nodeScales = scales[i];
 			uniforms.nodeColors = colors[i];
 		}
-		var translations = this.getUniforms('translation', 1e5);
+		var translations = this.getUniforms('linkTranslation', nodesPerMesh);
 		for (var i = this.linkEntities.length - 1; i >= 0; i--) {
-			this.linkEntities[i].meshRendererComponent.materials[0].uniforms.nodeTranslations = translations[0];
+			this.linkEntities[i].meshRendererComponent.materials[0].uniforms.linkTranslations = translations[i];
 		}
 	}
 	
@@ -141,11 +145,35 @@ define([
 		var nodeData = this.forceGraph.nodeData;
 		var arrays = [];
 		var trans = [];
-		var c = 0;
+
+		if (type === 'linkTranslation') {
+			var tA, tB;
+			var linkData = this.forceGraph.linkData;
+			var inToOut = this.forceGraph.inToOut;
+
+			for (var i = 0; i < linkData.length; i++) {
+				tA = nodeData[inToOut[linkData[i].nodeA]].position;
+				tB = nodeData[inToOut[linkData[i].nodeB]].position;
+				
+				trans.push(
+					tA[0], tA[1], tA[2],
+					tB[0], tB[1], tB[2]
+				);
+				if (i > 0 && (i + 1) % idsPerMesh === 0) {
+					arrays.push(trans);
+					trans = [];
+				}
+			}
+			if (trans.length) {
+				arrays.push(trans);
+			}
+			return arrays;
+		}
+		
 		var len, d;
 		for (var i = 0; i < nodeData.length; i++) {
 			if (type === 'translation') {
-				d = nodeData[i].transform.translation.data;
+				d = nodeData[i].position;
 				len = 3;
 			} else if (type === 'scale') {
 				d = [nodeData[i].size];
@@ -159,11 +187,9 @@ define([
 			for (var j = 0; j < len; j++) {
 				trans.push(d[j]);
 			}
-			c += len;
-			if(i > 0 && i % idsPerMesh === 0) {
+			if(i > 0 && (i + 1) % idsPerMesh === 0) {
 				arrays.push(trans);
 				trans = [];
-				c = 0;
 			}
 		}
 		if (trans.length) {
@@ -190,7 +216,8 @@ define([
 			cameraPosition : Shader.CAMERA,
 			nodeTranslations : [],
 			nodeScales : [],
-			nodeColors : []
+			nodeColors : [],
+			offset : 0
 		},
 		vshader : [ //
 		'attribute vec3 vertexPosition;', //
@@ -203,6 +230,7 @@ define([
 		'uniform vec3 nodeTranslations[NODE_COUNT];',
 		'uniform vec3 nodeColors[NODE_COUNT];',
 		'uniform float nodeScales[NODE_COUNT];',
+		'uniform float offset;',
 
 		ShaderBuilder.light.prevertex,
 
@@ -212,7 +240,7 @@ define([
 		'varying vec3 viewPosition;',
 
 		'void main(void) {', //
-		' int id = int(nodeId);',
+		' int id = int(nodeId) - int(offset) * NODE_COUNT;',
 		' color = nodeColors[id];',
 		' vec3 newpos = vertexPosition * nodeScales[id] + nodeTranslations[id];',
 		'	vec4 worldPos = vec4(newpos, 1.0);', //
@@ -249,27 +277,30 @@ define([
 	
 	var linkShaderDef = {
 		defines: {
-			NODE_COUNT: 10
+			LINK_COUNT: nodesPerMesh * 2
 		},
 		attributes : {
 			vertexPosition : MeshData.POSITION,
-			nodeId : 'NODE_ID'
+			linkId : 'LINK_ID'
 		},
 		uniforms : {
 			viewProjectionMatrix : Shader.VIEW_PROJECTION_MATRIX,
 			worldMatrix : Shader.WORLD_MATRIX,
-			nodeTranslations : []
+			linkTranslations : [],
+			offset : 0
 		},
 		vshader : [ //
 		'attribute vec3 vertexPosition;', //
-		'attribute float nodeId;', //
+		'attribute float linkId;', //
 
 		'uniform mat4 viewProjectionMatrix;',
 		'uniform mat4 worldMatrix;',//
-		'uniform vec3 nodeTranslations[NODE_COUNT];',
+		'uniform vec3 linkTranslations[LINK_COUNT];',
+		'uniform float offset;',
 
 		'void main(void) {', //
-		' vec3 pos = vertexPosition + nodeTranslations[int(nodeId)];',
+		' int id = int(linkId) - int(offset) * LINK_COUNT;',
+		' vec3 pos = vertexPosition + linkTranslations[id];',
 		'	vec4 worldPos = vec4(pos, 1.0);', //
 		'	gl_Position = viewProjectionMatrix * worldPos;', //
 		'}'//
@@ -279,7 +310,7 @@ define([
 
 		'void main(void)',//
 		'{',//
-		'	vec4 final_color = vec4(1.0);',//
+		'	vec4 final_color = vec4(0.7);',//
 		'	gl_FragColor = final_color;',//
 		'}'//
 		].join('\n')

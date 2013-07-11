@@ -23,7 +23,7 @@ define([
 		for (var i = 0; i < nodeData.length; i++) {
 			mesh = new ForceGraphSphere(i);
 			meshBuilder.addMeshData(mesh, transform);
-			if (i !== 0 && i % nodesPerMesh === 0) {
+			if (i > 0 && (i + 1) % nodesPerMesh === 0) {
 				meshDatas = meshDatas.concat(meshBuilder.build());
 				meshBuilder = new MeshBuilder();	
 			}
@@ -38,11 +38,9 @@ define([
 		var meshDatas = [];
 		var mesh, a, b;
 		for (var i = 0; i < linkData.length; i++) {
-			a = forceGraph.inToOut[linkData[i].nodeA];
-			b = forceGraph.inToOut[linkData[i].nodeB];
-			mesh = new ForceGraphLine(a, b);
+			mesh = new ForceGraphLine(i);
 			meshBuilder.addMeshData(mesh, transform);
-			if (i !== 0 && i % linksPerMesh === 0) {
+			if (i > 0 && (i + 1) % linksPerMesh === 0) {
 				meshDatas = meshDatas.concat(meshBuilder.build());
 				meshBuilder = new MeshBuilder();
 			}

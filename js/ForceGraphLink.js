@@ -5,16 +5,9 @@ define([
 ) {
 	'use strict';
 	
-	var defaults = {
-		length: 10,
-		strength: 0.1,
-		nodeA: null,
-		nodeB: null
-	}
-	
-	function ForceGraphLink(data, mapping) {
-		for (var key in defaults) {
-			this[key] = (data[mapping[key]] !== undefined) ? data[mapping[key]] : defaults[key];
+	function ForceGraphLink(data) {
+		for (var key in ForceGraphLink.defaults) {
+			this[key] = (data[key] !== undefined) ? data[key] : ForceGraphLink.defaults[key];
 		}
 		if(!this.nodeA || !this.nodeB) {
 			throw {
@@ -24,11 +17,11 @@ define([
 		}
 	}
 
-	ForceGraphLink.defaultMapping = {
-		nodeA: 'a',
-		nodeB: 'b',
-		length: 'length',
-		strength: 'strength'
+	ForceGraphLink.defaults = {
+		length: 30,
+		strength: 4e-4,
+		nodeA: null,
+		nodeB: null
 	};
 	
 	return ForceGraphLink;

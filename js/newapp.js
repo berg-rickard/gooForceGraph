@@ -5,79 +5,69 @@ require([
 	ForceGraph,
 	ForceGraphDisplayer
 ) {
+	'use strict';
 	var data = {
 		nodes: [],
 		links: []
 	};
 	//return;
-	for (var i = 0; i < 600; i++) {
-		var a = Math.random() * 3 + 1;
+	for (var i = 0; i < 1000; i++) {
 		data.nodes.push({
-			id: 'asdf' + i,
-			size: a,
-			weight: 3,
-			color: [Math.random(), Math.random(), Math.random()]
+			a: 'asdf' + i,
+			b: Math.random(),
 		});
 	}
-	/*for (var i = 1; i < 200; i++) {
-		var a = Math.floor(Math.random() * data.nodes.length);
-		var b = Math.floor(Math.random() * data.nodes.length);
-		data.links.push({
-			a: 'asdf'+a,
-			b: 'asdf'+b,
-			length: 2
-		});
-	}*/
-	/*
+	
+	
+	/**
 	setInterval(function() {
 		var a = Math.floor(Math.random() * data.nodes.length);
 		var b = Math.floor(Math.random() * data.nodes.length);
 		fg.addLinks({
-			a: 'asdf'+a,
-			b: 'asdf'+b,
-			length: 30
+			nodeA: 'asdf'+a,
+			nodeB: 'asdf'+b,
+			length: 20,
+			strength: 1e-4
 		});
-		fgd.rebuild();
-	}, 2000)
-	*/
-	/*
-	for (var i = 1; i < 10; i++) {
+		//fgd.rebuildNodes();
+		fgd.rebuildLinks();
+	}, 200);
+	/**/
+	/**/
+	for (var i = 0; i < data.nodes.length * 0.95; i++) {
+		if (i === 0) {
+			continue;
+		}
+		var idx = Math.floor(i / 8);
 		data.links.push({
-			a: 'asdf0',
-			b: 'asdf' + i
+			nodeA: 'asdf'+idx,
+			nodeB: 'asdf'+i
 		});
 	}
-	*/
+	/**/
+	
+	
+	
 	var fg = new ForceGraph(data, {
-		charge: 'weight'
+		id: 'a',
+		size: function(d) {
+			return d.b * 4 + 6
+		},
+		charge: function(d) {
+			return d.b * 2 + 0.1;
+		},
+		color: function(d) {
+			return [Math.random(), Math.random(), Math.random()];
+		}
 	});
 	
-	
-	//fg.removeNodes('asdf3');
-
-	console.log(fg);
-	
-	fgd = new ForceGraphDisplayer(fg);
+	var fgd = new ForceGraphDisplayer(fg);
 
 	/*
-	setTimeout(function() {
-		fg.addNodes({
-			id: 'tjalou',
-			weight: 10
-		});
-		fgd.rebuild();
-	}, 3000);
-	setTimeout(function() {
-		fg.addNodes({
-			id: 'tjenix',
-			weight: 5
-		});
-		fgd.rebuild();
-	}, 4000);
-	*/
-	setTimeout(function() {
-		fg.removeNodes('asdf5');
-		fgd.rebuild();
-	}, 5000);
-	
+	setInterval(function() {
+		var idx = Math.floor(Math.random() * fg.nodeData.length);
+		fg.removeNodes('asdf'+idx);
+		fgd.rebuildLinks();
+	}, 150);
+	*/	
 });

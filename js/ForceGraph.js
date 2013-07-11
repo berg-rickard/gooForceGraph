@@ -19,12 +19,10 @@ define([
 	}
 	
 	var defaults = {
-		gravity: 100
+		gravity: 1000
 	};
 	
-	var vec = new Vector3();
-	var depth = 4;
-	var pDepth = Math.pow(2, depth);
+	var vec = new Float32Array(3);
 
 	/**
 	 * @class Creates a forcegraph structure, handling all data and calculations
@@ -37,10 +35,8 @@ define([
 	 */
 	function ForceGraph(data, nodeMapping, linkMapping, properties) {
 		fillDefaults(properties, defaults, this);
-		this.nodeMapping = {};
-		fillDefaults(nodeMapping, ForceGraphNode.defaultMapping, this.nodeMapping);		
-		this.linkMapping = {};
-		fillDefaults(linkMapping, ForceGraphLink.defaultMapping, this.linkMapping);		
+		this.nodeMapping = nodeMapping || {};
+		this.linkMapping = linkMapping || {};
 		
 		this.inputNodes = {};
 		this.inputLinks = [];
@@ -49,10 +45,13 @@ define([
 		this.transforms = [];
 		this.inToOut = {};
 		
-		this.nodeMin = [0,0,0];
-		this.nodeMax = [0,0,0];
-		this._tree = {};
-		this._buildTree(this._tree, 8, depth);
+		//this.nodeMin = [0,0,0];
+		//this.nodeMax = [0,0,0];
+		//this.nodeRange = [0,0,0];
+		
+		//this.gridSize = 4;
+		//this._grid = null;
+		//this._buildGrid();
 		
 		if(data instanceof Object) {
 			if (data.nodes) {
@@ -76,7 +75,7 @@ define([
 		for (var i = 0; i < data.length; i++) {
 			tuple = data[i];
 			outputId = null;
-			id = tuple[this.nodeMapping.id];
+			id = this._map('id', tuple, 'node');
 
 			if (id === undefined) {
 				console.error('Data is missing id');
@@ -89,16 +88,24 @@ define([
 
 				outputId = this.inToOut[id];
 				node = this.nodeData[outputId];
-
-				for (var key in this.nodeMapping) {
-					if (tuple[this.nodeMapping[key]] !== undefined) {
-						node[key] = tuple[this.nodeMapping[key]];
+				
+				for (var key in ForceGraphNode.defaults) {
+					var value = this._map(key, tuple, 'node');
+					if (value !== undefined) {
+						node[key] = value;
 					}
 				}
 			} else {
 				console.log('Adding tuple '+id);
+				var item = {};
+				for (var key in ForceGraphNode.defaults) {
+					var value = this._map(key, tuple, 'node');
+					if (value !== undefined) {
+						item[key] = value;
+					}
+				}
 
-				node = new ForceGraphNode(tuple, this.nodeMapping);
+				node = new ForceGraphNode(item);
 
 				this.nodeData.push(node);
 				this.inToOut[id] = this.nodeData.length - 1;
@@ -147,8 +154,9 @@ define([
 		var idx, link, nodeA, nodeB, tuple
 		for (var i = 0; i < data.length; i++) {
 			tuple = data[i];
-			nodeA = tuple[this.linkMapping.nodeA];
-			nodeB = tuple[this.linkMapping.nodeB];
+			
+			nodeA = this._map('nodeA', tuple, 'link');
+			nodeB = this._map('nodeB', tuple, 'link');
 			
 			if (nodeA === undefined || nodeB === undefined) {
 				console.error('Data is missing node ids');
@@ -162,16 +170,25 @@ define([
 			if (idx) {
 				console.log('Updating link', nodeA, nodeB);
 				link = this.linkData[idx];
-				for (var key in this.linkMapping) {
-					if (tuple[this.linkMapping[key]] !== undefined) {
-						link[key] = tuple[this.linkMapping[key]];
-					} 
+				for (var key in ForceGraphLink.defaults) {
+					var value = this._map(key, tuple, 'link');
+					if (value !== undefined) {
+						link[key] = value;
+					}
 				}
 				this.inputLinks[idx] = tuple;
 			} else {
 				console.log('Adding link ', nodeA, nodeB);
+				var item = {}
 				
-				link = new ForceGraphLink(tuple, this.linkMapping);
+				for (var key in ForceGraphLink.defaults) {
+					var value = this._map(key, tuple, 'link');
+					if(value) {
+						item[key] = value;
+					}
+				}
+				
+				link = new ForceGraphLink(item);
 				this.linkData.push(link);
 				this.inputLinks.push(tuple);
 			}
@@ -184,8 +201,8 @@ define([
 		}
 		var nodeA, nodeB, idx;
 		for (var i = 0; i < data.length; i++) {
-			nodeA = data[i][this.linkMapping.nodeA];
-			nodeB = data[i][this.linkMapping.nodeB];
+			nodeA = this._map('nodeA', data[i], 'link');
+			nodeB = this._map('nodeB', data[i], 'link');
 			idx = this.getLink(nodeA, nodeB);
 			if (idx) {
 				console.log('Removing link between ' + nodeA + ' and ' +nodeB);
@@ -217,74 +234,77 @@ define([
 		}
 	};
 	
+	ForceGraph.prototype._map = function(key, data, type) {
+		var mapping;
+		if (type === 'node') {
+			mapping = this.nodeMapping;
+		} else {
+			mapping = this.linkMapping;
+		}
+		if (mapping[key] instanceof Function) {
+			return mapping[key](data);
+		} else if (typeof mapping[key] === 'string') {
+			return data[mapping[key]];
+		} else {
+			return data[key];
+		}
+	}
+	
 	ForceGraph.prototype.process = function(tpf) {
 		var iterations = Math.ceil(tpf / 0.01);
 		tpf /= iterations;
 		for (var i = 0; i < iterations; i++) {
-			this._updateAcceleration();
+			this._updateGravity();
+			
+			this._updateRepulsion();
+			this._updateAttraction();
 			for (var i = 0; i < this.nodeData.length; i++) {
 				this.nodeData[i].process(tpf);
 			}
 		}
-		this.updateMinMax();
-	};
-	
-	ForceGraph.prototype.updateMinMax = function() {
-		this.nodeMin = [0,0,0];
-		this.nodeMax = [0,0,0];
-		var t;
-		for (var i = 0; i < this.nodeData.length; i++) {
-			t = this.nodeData[i].transform.translation.data;
-			if(t[0] < this.nodeMin[0]) this.nodeMin[0] = t[0] * 1.001;
-			else if (t[0] > this.nodeMax[0]) this.nodeMax[0] = t[0] * 1.001;
-
-			if(t[1] < this.nodeMin[1]) this.nodeMin[1] = t[1] * 1.001;
-			else if (t[1] > this.nodeMax[1]) this.nodeMax[1] = t[1] * 1.001;
-
-			if(t[2] < this.nodeMin[2]) this.nodeMin[2] = t[2] * 1.001;
-			else if (t[2] > this.nodeMax[2]) this.nodeMax[2] = t[2] * 1.001;
-		}
-	}
-	
-	ForceGraph.prototype._updateAcceleration = function() {
-		for (var i = 0; i < this.nodeData.length; i++) {
-			this.nodeData[i]._acceleration.setd(0,0,0);
-		}
-		this._updateGravity();
-		this._updateRepulsion();
-		this._updateAttraction();
+		//this.updateMinMax();
 	};
 	
 	ForceGraph.prototype._updateGravity = function() {
-		var pos, node;
+		var pos, node, lenSq, len;
 		for (var i = 0; i < this.nodeData.length; i++) {
 			node = this.nodeData[i];
-			pos = node.transform.translation;
-			vec.setv(pos).invert();
-			if (vec.lengthSquared() > 16e-4) {
-				vec.normalize()
+			pos = node.position;
+			vec = node._acceleration;
+			
+			vec[0] = -pos[0];
+			vec[1] = -pos[1];
+			vec[2] = -pos[2];
+			
+			lenSq = vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2];
+			if (lenSq > 16e-4) {
+				len = Math.sqrt(lenSq);
+				vec[0] /= len;
+				vec[1] /= len;
+				vec[2] /= len;
 			}
-			vec.scale(this.gravity);
-			node._acceleration.addv(vec);
+			vec[0] *= this.gravity;
+			vec[1] *= this.gravity;
+			vec[2] *= this.gravity;
 		}
 	};
 	
 	ForceGraph.prototype._updateRepulsion = function() {
 		var nodeA, nodeB, posA, posB, force, inv, len, lenSq;
-		var vd = vec.data;
+		var vd = vec;
 		for (var i = this.nodeData.length - 1; i >= 0; i--) {
 			nodeA = this.nodeData[i];
-			posA = nodeA.transform.translation;
+			posA = nodeA.position;
 
 			for (var j = i - 1; j >= 0; j--) {
 
 				nodeB = this.nodeData[j];
-				posB = nodeB.transform.translation;
+				posB = nodeB.position;
 				
 				// vec.setv(posB).subv(posA)
-				vd[0] = posB.data[0] - posA.data[0];
-				vd[1] = posB.data[1] - posA.data[1];
-				vd[2] = posB.data[2] - posA.data[2];
+				vd[0] = posB[0] - posA[0];
+				vd[1] = posB[1] - posA[1];
+				vd[2] = posB[2] - posA[2];
 				
 				// lenSq = vec.lengthSquared()
 				lenSq = vd[0] * vd[0] + vd[1] * vd[1] + vd[2] * vd[2];
@@ -295,183 +315,207 @@ define([
 				
 				// vec.normalize()
 				len = Math.sqrt(lenSq);
-				vd[0] /= len;
-				vd[1] /= len;
-				vd[2] /= len;
-				
-				// vec.scale(force);
-				vec.data[0] *= force;
-				vec.data[1] *= force;
-				vec.data[2] *= force;
+				vd[0] = vd[0] * force / len;
+				vd[1] = vd[1] * force / len;
+				vd[2] = vd[2] * force / len;
 				
 				// node._acceleration.addv(vec)
-				nodeB._acceleration.data[0] += vec.data[0];
-				nodeB._acceleration.data[1] += vec.data[1];
-				nodeB._acceleration.data[2] += vec.data[2];
+				nodeB._acceleration[0] += vd[0];
+				nodeB._acceleration[1] += vd[1];
+				nodeB._acceleration[2] += vd[2];
 				
 				inv = -nodeB.mass / nodeA.mass;
 				
 				// vec.scale(inv)
-				vec.data[0] *= inv;
-				vec.data[1] *= inv;
-				vec.data[2] *= inv;
+				vd[0] *= inv;
+				vd[1] *= inv;
+				vd[2] *= inv;
 
 				// nodeA._acceleration.addv(vec);
-				nodeA._acceleration.data[0] += vec.data[0];
-				nodeA._acceleration.data[1] += vec.data[1];
-				nodeA._acceleration.data[2] += vec.data[2];
+				nodeA._acceleration[0] += vd[0];
+				nodeA._acceleration[1] += vd[1];
+				nodeA._acceleration[2] += vd[2];
 			}
 		}
 	};
 	
-	ForceGraph.prototype.__updateRepulsion = function() {
-		this._clearTree(this._tree);
-		var tree = this._tree;
+	ForceGraph.prototype._updateAttraction = function() {
+		var nodeA, nodeB, posA, posB, force, len;
+		for (var i = 0; i < this.linkData.length; i++) {
+			nodeA = this.nodeData[this.inToOut[this.linkData[i].nodeA]];
+			nodeB = this.nodeData[this.inToOut[this.linkData[i].nodeB]];
 
-		var t, x, y, z;
-		var min = this.nodeMin;
-		var max = this.nodeMax;
-		var max_min = [
-			max[0]-min[0],
-			max[1]-min[1],
-			max[2]-min[2]
-		];
-		for (var i = this.nodeData.length - 1; i >= 0; i--) {
-			t = this.nodeData[i].transform.translation.data;
-			x = Math.floor((t[0] - min[0])/(max_min[0])*pDepth)
-			y = Math.floor((t[1] - min[1])/(max_min[1])*pDepth);
-			z = Math.floor((t[2] - min[2])/(max_min[2])*pDepth);
-			putInTree(this.nodeData[i], tree, x, y, z, depth)
-		}
-		var nodeData;
-		for (var j = this.nodeData.length - 1; j >= 0; j--) {
-			nodeData = this.nodeData[j];
-			this._calcNode(nodeData, tree);
+			posA = nodeA.position;
+			posB = nodeB.position;
+
+			vec[0] = posA[0] - posB[0];
+			vec[1] = posA[1] - posB[1];
+			vec[2] = posA[2] - posB[2];
+			
+			len = Math.sqrt(vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]);
+			force = (this.linkData[i].length - len) * this.linkData[i].strength;
+			
+			vec[0] = vec[0] * force / len;
+			vec[1] = vec[1] * force / len;
+			vec[2] = vec[2] * force / len;
+			
+			nodeA._acceleration[0] += vec[0] / nodeA.mass;
+			nodeA._acceleration[1] += vec[1] / nodeA.mass;
+			nodeA._acceleration[2] += vec[2] / nodeA.mass;
+
+			nodeB._acceleration[0] -= vec[0] / nodeB.mass;
+			nodeB._acceleration[1] -= vec[1] / nodeB.mass;
+			nodeB._acceleration[2] -= vec[2] / nodeB.mass;
 		}
 	}
+	/**
+	ForceGraph.prototype.__updateRepulsion = function() {
+		this.updateMinMax();
+		this._buildGrid()
+		this._fillGrid();
 
-	ForceGraph.prototype._calcNode = function(nodeData, branch, node) {
-		var child, c, force, lensq;
-		for (var i = branch.children.length - 1; i >= 0; i--) {
-			if(branch.children[i] instanceof ForceGraphNode) {
-				if(branch.children[i] === nodeData) {
+		var nodeA, nodeB, posA, posB, gi, force, inv, len, lenSq;
+		var vd = vec.data;
+		for (var i = this.nodeData.length - 1; i >= 0; i--) {
+			nodeA = this.nodeData[i];
+			posA = nodeA.transform.translation.data;
+			gi = nodeA.gridIndex;
+			for (var idx = this._grid.length - 1; idx >= 0; idx--) {
+				if (this._grid[idx].charge === 0) {
 					continue;
 				}
-				child = branch.children[i];
-				c = child.transform.translation;
-				vec.setv(nodeData.transform.translation).subv(c);
-			} else if(branch.children[i].descendants.indexOf(nodeData) > -1) {
-				this._calcNode(nodeData, branch.children[i]);
-				continue;
-			} else if(branch.children[i].charge === 0) {
-				continue;
-			} else {
-				child = branch.children[i];
-				c = branch.children[i].center;
-				vec.setv(nodeData.transform.translation).sub_d(c[0], c[1], c[2]);
-			}
-			lensq = vec.lengthSquared();
-			force = nodeData.charge * child.charge / lensq;
-			vec.normalize();
-			vec.scale(force / nodeData.mass);
-			nodeData._acceleration.addv(vec);
-		}
-	}
-	
-	
-	ForceGraph.prototype._updateAttraction = function() {
-		var nodeA, nodeB, posA, posB, force;
-		for (var i = 0; i < this.linkData.length; i++) {
-			nodeA = this.linkData[i].nodeA;
-			nodeB = this.linkData[i].nodeB;
-			
-			nodeA = this.nodeData[this.inToOut[nodeA]];
-			nodeB = this.nodeData[this.inToOut[nodeB]];
-			posA = nodeA.transform.translation;
-			posB = nodeB.transform.translation;
+				if (gi === idx) {
+					for (var j = this._grid[idx].nodes.length - 1; j >= 0; j--) {
+						nodeB = this._grid[idx].nodes[j];
+						if (nodeA === nodeB) continue;
+						posB = nodeB.transform.translation.data;
+						
+						// vec.setv(posB).subv(posA)
+						vd[0] = posA[0] - posB[0];
+						vd[1] = posA[1] - posB[1];
+						vd[2] = posA[2] - posB[2];
+						
+						// lenSq = vec.lengthSquared()
+						lenSq = vd[0] * vd[0] + vd[1] * vd[1] + vd[2] * vd[2];
+						if (lenSq > 1e4) continue;
+						
+						force = nodeA.charge * nodeB.charge / (lenSq * nodeA.mass);
+						if (force < 1e-6) continue;
+						
+						// vec.normalize()
+						len = Math.sqrt(lenSq);
+						
+						// node._acceleration.addv(vec)
+						nodeA._acceleration.data[0] += vd[0] * force / len;
+						nodeA._acceleration.data[1] += vd[1] * force / len;
+						nodeA._acceleration.data[2] += vd[2] * force / len;
 
-			vec.setv(posA).subv(posB);
-			force = (this.linkData[i].length - vec.length()) * this.linkData[i].strength;
-			vec.normalize();
+					}
+				} else {
+					posB = this._grid[idx].position;
+					
+					// vec.setv(posB).subv(posA)
+					vd[0] = posA[0] - posB[0];
+					vd[1] = posA[1] - posB[1];
+					vd[2] = posA[2] - posB[2];
 
-			vec.scale(force / nodeA.mass);
-			nodeA._acceleration.addv(vec);
-			vec.scale(- nodeA.mass / nodeB.mass);
-			nodeB._acceleration.addv(vec);
-		}
-	}
-	
-	ForceGraph.prototype.getTranslationArrays = function(idsPerMesh) {
-		var arrays = [];
-		var trans = [];
-		var c = 0;
-		for (var i = 0; i < this.nodeData.length; i++) {
-			var d = this.nodeData[i].transform.translation.data;
-			trans[c] = d[0];
-			trans[c+1] = d[1];
-			trans[c+2] = d[2];
-			c += 3;
-			if(i > 0 && i % idsPerMesh === 0) {
-				arrays.push(trans);
-				trans = [];
-				c = 0;
+					// lenSq = vec.lengthSquared()
+					lenSq = vd[0] * vd[0] + vd[1] * vd[1] + vd[2] * vd[2];
+					if (lenSq > 1e4) continue;
+					
+					force = nodeA.charge * this._grid[idx].charge / (lenSq * nodeA.mass);
+					if (force < 1e-6) continue;
+					
+					// vec.normalize()
+					len = Math.sqrt(lenSq);
+					
+					// node._acceleration.addv(vec)
+					nodeA._acceleration.data[0] += vd[0] * force / len;
+					nodeA._acceleration.data[1] += vd[1] * force / len;
+					nodeA._acceleration.data[2] += vd[2] * force / len;
+				}
 			}
 		}
-		if (trans.length) {
-			arrays.push(trans);
-		}
-		return arrays;
-	}
-	
-	ForceGraph.prototype._buildTree = function(root, count, level) {
-		root.children || (root.children = []);
-		for(var i = 0; i < count; i++) {
-			var obj = {
-				center: [0,0,0],
-				charge: 0,
-				children: [],
-				parent: root,
-				descendants: []
-			}
-			root.children.push(obj);
-			if(level > 1) this._buildTree(obj, count, level - 1);
-		}
-	}
-	ForceGraph.prototype._clearTree = function(branch) {
-		var child;
-		for (var i = branch.children.length - 1; i >= 0; i--) {
-			child = branch.children[i];
-			child.descendants = [];
-			child.center[0] = 0;
-			child.center[1] = 0;
-			child.center[2] = 0;
-			child.charge = 0;
-			if (child.children.length && child.children[0] instanceof ForceGraphNode) {
-				child.children = [];
-			} else {
-				this._clearTree(child);
-			}
-		}
-	}
-
-	function putInTree(node, tree, x, y, z, level) {
-		var bx = x >> (level - 1);
-		var by = y >> (level - 1);
-		var bz = z >> (level - 1);
-		var branch = tree.children[bx << 2 | by << 1 | bz];
-		var t = node.transform.translation.data;
-		branch.center[0] = (branch.center[0] * branch.charge + t[0] * node.charge) / (branch.charge + node.charge);
-		branch.center[1] = (branch.center[1] * branch.charge + t[1] * node.charge) / (branch.charge + node.charge);
-		branch.center[2] = (branch.center[2] * branch.charge + t[2] * node.charge) / (branch.charge + node.charge);
-		branch.charge += node.charge;
 		
-		x ^= bx << (level - 1);
-		y ^= by << (level - 1);
-		z ^= bz << (level - 1);
-		if(level > 1) putInTree(node, branch, x, y, z, level - 1);
-		else branch.children.push(node);
-		branch.descendants.push(node);
+	}
+
+	ForceGraph.prototype.updateMinMax = function() {
+		this.nodeMin = [0,0,0];
+		this.nodeMax = [0,0,0];
+		var t;
+		for (var i = 0; i < this.nodeData.length; i++) {
+			t = this.nodeData[i].transform.translation.data;
+			if(t[0] < this.nodeMin[0]) this.nodeMin[0] = t[0];
+			else if (t[0] > this.nodeMax[0]) this.nodeMax[0] = t[0];
+
+			if(t[1] < this.nodeMin[1]) this.nodeMin[1] = t[1];
+			else if (t[1] > this.nodeMax[1]) this.nodeMax[1] = t[1];
+
+			if(t[2] < this.nodeMin[2]) this.nodeMin[2] = t[2];
+			else if (t[2] > this.nodeMax[2]) this.nodeMax[2] = t[2];
+		}
+		this.nodeMax[0] *= 1.001;
+		this.nodeMax[1] *= 1.001;
+		this.nodeMax[2] *= 1.001;
+
+		this.nodeMin[0] *= 1.001;
+		this.nodeMin[1] *= 1.001;
+		this.nodeMin[2] *= 1.001;
+		
+		this.nodeRange[0] = this.nodeMax[0] - this.nodeMin[0];
+		this.nodeRange[1] = this.nodeMax[1] - this.nodeMin[1];
+		this.nodeRange[2] = this.nodeMax[2] - this.nodeMin[2];
+	}
+
+	ForceGraph.prototype._buildGrid = function() {
+		var size = this.gridSize;
+		if(!this._grid) {
+			var grid = this._grid = [];
+			for (var i = Math.pow(size, 3) - 1; i >= 0; i--) {
+				grid[i] = {
+						position: [0,0,0],
+						charge: 0.0,
+						nodes: []
+				}
+			}
+		} else {
+			var grid = this._grid;
+			for (var i = Math.pow(size, 3) - 1; i >= 0; i--) {
+				grid[i].position = [0,0,0];
+				grid[i].charge = 0.0;
+				grid[i].nodes = [];
+			}
+		}
 	}
 	
+	ForceGraph.prototype._fillGrid = function() {
+		var x, y, z, idx, t, g, node, chargeSum;
+		var scale = [
+			this.gridSize / this.nodeRange[0],
+			this.gridSize / this.nodeRange[1],
+			this.gridSize / this.nodeRange[2]
+		];
+		for (var i = this.nodeData.length - 1; i >= 0; i--) {
+			node = this.nodeData[i];
+			t = node.transform.translation.data;
+			x = ((t[0] - this.nodeMin[0]) * scale[0]) & 0xf;
+			y = ((t[1] - this.nodeMin[1]) * scale[1]) & 0xf;
+			z = ((t[2] - this.nodeMin[2]) * scale[2]) & 0xf;
+			idx = x << 2;
+			idx |= y << 1;
+			idx |= z;
+			
+			node.gridIndex = idx;
+			g = this._grid[idx];
+			g.nodes.push(node);
+			chargeSum = g.charge + node.charge;
+			g.position[0] = (g.position[0] * g.charge + t[0] * node.charge) / chargeSum;
+			g.position[1] = (g.position[1] * g.charge + t[1] * node.charge) / chargeSum;
+			g.position[2] = (g.position[2] * g.charge + t[2] * node.charge) / chargeSum;
+			
+			g.charge += node.charge;
+		}
+	}
+	*/
 	return ForceGraph
 });
