@@ -1,3 +1,5 @@
+// REVIEW: consider renaming this file to MyCamControlScript
+
 define(
 [
 	'goo/scripts/OrbitCamControlScript',
