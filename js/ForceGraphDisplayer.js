@@ -35,7 +35,7 @@ define([
 ) {
 	'use strict';
 	
-	var nodesPerMesh = 300;
+	var nodesPerMesh = 50;
 	
 	function ForceGraphDisplayer(forceGraph) {
 		var goo = new GooRunner({

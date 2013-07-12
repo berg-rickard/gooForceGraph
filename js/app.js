@@ -12,7 +12,7 @@ require([
 		links: []
 	};
 	//return;
-	for (var i = 0; i < 1000; i++) {
+	for (var i = 0; i < 900; i++) {
 		data.nodes.push({
 			a: 'asdf' + i,
 			b: Math.random(),

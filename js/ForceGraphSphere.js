@@ -15,7 +15,7 @@ define([
 		
 		
 		var attr = MeshData.createAttribute(1, 'Short');
-		Sphere.call(this);
+		Sphere.call(this, 20, 20);
 		this.attributeMap['NODE_ID'] = attr;
 		this.rebuildData();
 		this._rebuild();
