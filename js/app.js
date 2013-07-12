@@ -1,3 +1,4 @@
+require(['goo'], function() {
 require([
 	'ForceGraph',
 	'ForceGraphDisplayer'
@@ -70,4 +71,5 @@ require([
 		fgd.rebuildLinks();
 	}, 150);
 	*/	
+});
 });
